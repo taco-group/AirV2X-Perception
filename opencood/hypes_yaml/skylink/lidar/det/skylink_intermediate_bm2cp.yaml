@@ -1,0 +1,286 @@
+# This yaml only contains CoAlign's multiscale intermediate feature fusion.
+# If you want build the agent-object pose graph to correct pose error, 
+# please refer to https://github.com/yifanlu0227/CoAlign
+
+name: skylink_intermediate_bm2cp
+root_dir: 'dataset/skylink/train'
+validate_dir: 'dataset/skylink/val'
+num_class: &num_class 7
+num_anchor: &num_anchor 2
+device: cuda
+task: &task "det" # "det" or "seg"
+seg_hw: &seg_hw 512 # resolution of the segmentation map
+seg_res: &seg_res 0.25
+
+active_sensors: &active_sensors ["lidar"]
+collaborators: &collaborators ["vehicle", "rsu", "drone"]
+bevcam_fov: 110
+
+yaml_parser: "load_skylink_bm2cp_params" # add support for skylink
+train_params:
+  batch_size: &batch_size 2
+  epoches: 20
+  eval_freq: 5
+  save_freq: 1
+  max_cav:
+    vehicle: 3
+    rsu: 2
+    drone: 2
+
+
+device: &device cuda
+train: &train True
+
+fusion:
+  core_method: 'IntermediateFusionDatasetSkylinkBM2CP' # LateFusionDataset, EarlyFusionDataset, IntermediateFusionDataset supported
+  args:
+    proj_first: &proj_first true
+    grid_conf: &grid_conf
+      xbound: [-140.8, 140.8, 0.4]    # 限制x方向的范围并划分网格
+      ybound: [-40, 40, 0.4]   # 限制y方向的范围并划分网格
+      zbound: [-10, 10, 20.0]   # 限制z方向的范围并划分网格
+      ddiscr: [2, 50, 48]
+      mode: 'LID'
+    data_aug_conf: &data_aug_conf_image
+      resize_lim: [0.65, 0.7]
+      final_dim: [360, 640]
+      rot_lim: [0, 0]
+      H: 720 # 720
+      W: 1280 # 1280
+      rand_flip: False
+      bot_pct_lim: [0.0, 0.05]
+      # cams: ['camera0', 'camera1', 'camera2', 'camera3']
+      # Ncams: 4
+
+data_augment:
+  - NAME: random_world_flip
+    ALONG_AXIS_LIST: [ 'x' ]
+
+  - NAME: random_world_rotation
+    WORLD_ROT_ANGLE: [ -0.78539816, 0.78539816 ]
+
+  - NAME: random_world_scaling
+    WORLD_SCALE_RANGE: [ 0.95, 1.05 ]
+
+image_modality:
+  grid_conf: 
+    xbound: [-140.8, 140.8, 0.4]   # 限制x方向的范围并划分网格
+    ybound: [-40, 40, 0.4]   # 限制y方向的范围并划分网格
+    zbound: [-10, 10, 20.0]   # 限制z方向的范围并划分网格
+    ddiscr: [2, 50, 48]
+    mode: 'LID'
+  data_aug_conf:
+    resize_lim: [0.65, 0.7]
+    final_dim: [360, 640]
+    rot_lim: [0, 0] # [-3.6, 3.6]
+    H: 720
+    W: 1280
+    rand_flip: False
+    bot_pct_lim: [0.0, 0.05]
+  shrink_header:
+    input_dim: 160
+    kernel_size: 1
+    dim: 1
+    stride: 1
+    padding: 1 
+  bevout_feature: 64 # tbd
+  img_downsample: 8
+  img_features: 64
+  anchor_number: *num_anchor
+  camera_encoder: EfficientNet
+  use_depth_gt: True
+  depth_supervision: False
+
+
+lidar_modality:
+  data_aug_conf:
+    - NAME: random_world_flip
+      ALONG_AXIS_LIST: [ 'x' ]
+
+    - NAME: random_world_rotation
+      WORLD_ROT_ANGLE: [ -0.78539816, 0.78539816 ]
+
+    - NAME: random_world_scaling
+      WORLD_SCALE_RANGE: [ 0.95, 1.05 ]
+
+# preprocess-related
+preprocess:
+  # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+  core_method: 'SpVoxelPreprocessor'
+  args:
+    voxel_size: &voxel_size [0.4, 0.4, 400]
+    max_points_per_voxel: 32
+    max_voxel_train: 32000
+    max_voxel_test: 70000
+  # lidar range for each individual cav.
+  cav_lidar_range: &cav_lidar [-140.8, -40, -200, 140.8, 40, 200]    
+  rsu_lidar_range: &rsu_lidar [-140.8, -40, -3, 140.8, 40, 1]    
+
+# anchor box related
+postprocess:
+  core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+  anchor_args:
+    cav_lidar_range: *cav_lidar
+    l: 3.9
+    w: 1.6
+    h: 1.56
+    r: [0, 90]
+    feature_stride: 2
+    num: *num_anchor
+  target_args:
+    pos_threshold: 0.6
+    neg_threshold: 0.45
+    score_threshold: 0.20
+  order: 'hwl' # hwl or lwh
+  max_num: 300 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+  nms_thresh: 0.15
+
+# model related
+model:
+  core_method: skylink_bm2cp 
+  args:
+    collaborators: *collaborators
+    active_sensors: *active_sensors
+    device: *device
+    train: *train
+    proj_first: *proj_first
+    supervise_single: False
+    backbone_fix: False
+
+    vehicle:
+      img_params:
+        grid_conf: *grid_conf
+        data_aug_conf: *data_aug_conf_image
+        img_downsample: 8
+        bev_dim: 64
+        use_depth_gt: true
+        depth_supervision: false #true
+      pc_params:
+        voxel_size: *voxel_size
+        lidar_range: *cav_lidar
+        pillar_vfe:
+          use_norm: True
+          with_distance: False
+          use_absolute_xyz: True
+          num_filters: [ 64 ]
+        point_pillar_scatter:
+          num_features: 64
+    rsu:
+      img_params:
+        grid_conf: *grid_conf
+        data_aug_conf: *data_aug_conf_image
+        img_downsample: 8
+        bev_dim: 64
+        use_depth_gt: true
+        depth_supervision: false #true
+      pc_params:
+        voxel_size: *voxel_size
+        lidar_range: *cav_lidar
+        pillar_vfe:
+          use_norm: True
+          with_distance: False
+          use_absolute_xyz: True
+          num_filters: [ 64 ]
+        point_pillar_scatter:
+          num_features: 64
+    drone:
+      grid_conf: *grid_conf
+      data_aug_conf: *data_aug_conf_image
+      img_downsample: 8
+      img_features: 64
+      bevout_feature: 64
+      bev_dim: 64
+      camera_encoder: EfficientNet
+      use_depth_gt: true
+      depth_supervision: false
+      
+    # params for modality fusion
+    modality_fusion:
+      bev_backbone:
+        encode_first: false
+        multi_scale: true
+
+        layer_nums: &layer_nums [3, 4, 5] #[ 3, 5, 8 ]
+        layer_strides: [ 2, 2, 2 ]
+        num_filters: &num_filters [ 64, 128, 256 ]
+        upsample_strides: [ 1, 2, 4 ]
+        num_upsample_filter: [ 128, 128, 128 ]
+        voxel_size: *voxel_size
+      
+      shrink_header:
+        use: true 
+        input_dim: 384  # 128 * 3
+        dim: [ &out_channels 256 ] 
+        kernal_size: [ 1 ] # we don't shrink the HW in the current version
+        stride: [ 1 ]
+        padding: [ 0 ]
+      
+      compression: 0  # Compression rate
+
+      # params for collaborative fusion: where2comm
+    collaborative_fusion:
+      fully: False
+      voxel_size: *voxel_size
+      downsample_rate: 1
+      in_channels: *out_channels
+      
+      communication:
+        round: 1
+        #threshold: 0.01
+        #gaussian_smooth:
+        #  k_size: 5
+        #  c_sigma: 1.0
+      agg_operator:
+        mode: 'ATTEN'
+        feature_dim: *out_channels
+      multi_scale: True
+      layer_nums: *layer_nums
+      num_filters: *num_filters
+
+    # params for prediction
+    task: *task
+    seg_branch: *seg_branch
+    seg_hw: *seg_hw
+    head_dim: 256
+    outC: *out_channels
+    anchor_number: *num_anchor
+    num_class: *num_class
+    dynamic_class: *dynamic_class
+    static_class: *static_class
+    cav_range: *cav_lidar
+    seg_res: *seg_res
+    obj_head: trueloss:
+  det:
+    core_method: point_pillar_loss_multiclass
+    args:
+      cls_weight: 1.0
+      reg: 2.0
+      num_class: *num_class
+  seg:
+    core_method: vanilla_seg_loss
+    args:
+      seg_branch: *seg_branch
+      d_weights:
+        - 200.0
+        - 200.0
+        - 75.0
+        - 200.0
+        - 200.0
+        - 200.0
+      s_weights: 50.0
+      l_weights: 8.0
+      d_coe: 2.0
+      s_coe: 0.0
+
+optimizer:
+  core_method: Adam
+  lr: 0.002
+  args:
+    eps: 1e-10
+    weight_decay: 1e-4
+
+lr_scheduler:
+  core_method: multistep #step, multistep and Exponential support
+  gamma: 0.2
+  step_size: [10, 20]
+
