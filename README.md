@@ -9,3 +9,7 @@ Official implementation of AirV2X: Unified Air-Ground\\Vehicle-to-Everything Col
 
 
 Please download the dataset at [AirV2X-Perception](https://huggingface.co/datasets/xiangbog/AirV2X-Perception). We provide mini dataset batch for test training.
+
+The training and evaluation codes are released.
+
+The usage instructions will be provided soon!
