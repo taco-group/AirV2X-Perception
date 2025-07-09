@@ -133,7 +133,6 @@ class IntermediateFusionDatasetSkylinkHEAL(basedataset.BaseDataset):
         agent_order = self.agent_order
         
         base_data_dict, scenario_index, timestamp_key = self.retrieve_base_data(
-        base_data_dict, scenario_index, timestamp_key = self.retrieve_base_data(
             idx, cur_ego_pos_flag=self.cur_ego_pose_flag
         )
 
@@ -897,7 +896,6 @@ class IntermediateFusionDatasetSkylinkHEAL(basedataset.BaseDataset):
         gt_box_tensor : torch.Tensor
             The tensor of gt bounding box.
         """
-        pred_box_tensor, pred_score, pred_labels, pred_boxes3d = (
         pred_box_tensor, pred_score, pred_labels, pred_boxes3d = (
             self.post_processor.post_process_skylink(data_dict, output_dict)
         )

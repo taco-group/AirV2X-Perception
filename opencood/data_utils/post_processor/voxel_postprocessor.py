@@ -794,6 +794,9 @@ class VoxelPostprocessor(BasePostprocessor):
         if len(pred_box2d_list) == 0 or len(pred_box3d_list) == 0:
             return None, None, None, None
 
+        # Concatenate results across CAVs
+        pred_box2d_tensor = torch.vstack(pred_box2d_list)
+        scores = pred_box2d_tensor[:, -1]
         pred_box3d_tensor = torch.vstack(pred_box3d_list)
         labels = torch.cat(pred_label_list)
         boxes3d = torch.cat(boxes3d_list)

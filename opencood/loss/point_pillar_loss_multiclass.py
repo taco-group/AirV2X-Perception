@@ -86,9 +86,9 @@ class PointPillarLossMultiClass(nn.Module):
         self.flow_weight = args["flow_weight"] if "flow_weight" in args else 1.0
         self.loss_dict = {}
         self.use_dir = False
-        self.obj_gamma = args["obj_gamma"]
-        self.obj_alpha = args["obj_alpha"]
-        self.neg_weight = 0.2
+        # self.obj_gamma = args["obj_gamma"]
+        # self.obj_alpha = args["obj_alpha"]
+        # self.neg_weight = 0.2
 
         self.cls_num = args["num_class"]
 
