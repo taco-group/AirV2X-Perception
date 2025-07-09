@@ -236,7 +236,6 @@ def load_skylink_v2vnet_params(param):
         Modified parameter dictionary with new attribute.
     """
     cav_lidar_range = param["preprocess"]["cav_lidar_range"]
-    rsu_lidar_range = param["preprocess"]["rsu_lidar_range"]
     voxel_size = param["preprocess"]["args"]["voxel_size"]
     max_cav = param["train_params"]["max_cav"]
     max_cav_num = (
@@ -248,18 +247,20 @@ def load_skylink_v2vnet_params(param):
 
 
     veh_lidar_range = param["model"]["args"]["vehicle"]["lidar"]["lidar_range"]
+    veh_voxel_size = param["model"]["args"]["vehicle"]["lidar"]["voxel_size"]
     veh_grid_size = (
         np.array(veh_lidar_range[3:6]) - np.array(veh_lidar_range[0:3])
-    ) / np.array(voxel_size)
+    ) / np.array(veh_voxel_size)
     veh_grid_size = np.round(veh_grid_size).astype(np.int64)
     param["model"]["args"]["vehicle"]["lidar"]["point_pillar_scatter"]["grid_size"] = veh_grid_size
 
     print("vehicle grid_size: ", veh_grid_size)
 
     rsu_lidar_range = param["model"]["args"]["rsu"]["lidar"]["lidar_range"]
+    rsu_voxel_size = param["model"]["args"]["rsu"]["lidar"]["voxel_size"]
     rsu_grid_size = (
         np.array(rsu_lidar_range[3:6] - np.array(rsu_lidar_range[0:3]))
-    ) / np.array(voxel_size)
+    ) / np.array(rsu_voxel_size)
     rsu_grid_size = np.round(rsu_grid_size).astype(np.int64)
     param["model"]["args"]["rsu"]["lidar"]["point_pillar_scatter"]["grid_size"] = rsu_grid_size
     print("rsu grid_size: ", rsu_grid_size)
@@ -267,9 +268,10 @@ def load_skylink_v2vnet_params(param):
     
     
     drone_lidar_range = param["model"]["args"]["drone"]["lidar"]["lidar_range"]
+    drone_voxel_size = param["model"]["args"]["drone"]["lidar"]["voxel_size"]
     drone_grid_size = (
         np.array(drone_lidar_range[3:6] - np.array(drone_lidar_range[0:3]))
-    ) / np.array(voxel_size)
+    ) / np.array(drone_voxel_size)
     drone_grid_size = np.round(drone_grid_size).astype(np.int64)
     param["model"]["args"]["drone"]["lidar"]["point_pillar_scatter"]["grid_size"] = rsu_grid_size
     print("drone grid_size: ", drone_grid_size)
@@ -312,7 +314,6 @@ def load_skylink_bm2cp_params(param):
         Modified parameter dictionary with new attribute.
     """
     cav_lidar_range = param["preprocess"]["cav_lidar_range"]
-    rsu_lidar_range = param["preprocess"]["rsu_lidar_range"]
     voxel_size = param["preprocess"]["args"]["voxel_size"]
 
     # TODO(YH): it allows different config of agents, but for now we still use same config for veh & rsu

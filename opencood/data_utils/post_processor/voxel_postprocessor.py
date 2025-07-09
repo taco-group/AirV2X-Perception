@@ -27,6 +27,13 @@ class VoxelPostprocessor(BasePostprocessor):
         super(VoxelPostprocessor, self).__init__(anchor_params, dataset, train)
         self.anchor_num = self.params["anchor_args"].get("num", 2)
         self.num_class = self.params["anchor_args"].get("num_class", 7)
+        ego_type = self.params["ego_type"]
+        if ego_type == "vehicle":
+            self.lidar_range = self.params["anchor_args"]["cav_lidar_range"]
+        elif ego_type == "rsu":
+            self.lidar_range = self.params["anchor_args"]["rsu_lidar_range"]
+        elif ego_type == "drone":
+            self.lidar_range = self.params["anchor_args"]["drone_lidar_range"]
 
     def generate_anchor_box(self):
         W = self.params["anchor_args"]["W"]
@@ -44,12 +51,12 @@ class VoxelPostprocessor(BasePostprocessor):
         vw = self.params["anchor_args"]["vw"]
 
         xrange = [
-            self.params["anchor_args"]["cav_lidar_range"][0],
-            self.params["anchor_args"]["cav_lidar_range"][3],
+            self.lidar_range[0],
+            self.lidar_range[3],
         ]
         yrange = [
-            self.params["anchor_args"]["cav_lidar_range"][1],
-            self.params["anchor_args"]["cav_lidar_range"][4],
+            self.lidar_range[1],
+            self.lidar_range[4],
         ]
 
         if "feature_stride" in self.params["anchor_args"]:
@@ -569,7 +576,7 @@ class VoxelPostprocessor(BasePostprocessor):
         # filter out the prediction out of the range.
         # mask = box_utils.get_mask_for_boxes_within_range_torch(pred_box3d_tensor, self.params['gt_range'])
         mask = box_utils.get_mask_for_boxes_within_range_torch(
-            pred_box3d_tensor, self.params["anchor_args"]["cav_lidar_range"]
+            pred_box3d_tensor, self.lidar_range
         )
         pred_box3d_tensor = pred_box3d_tensor[mask, :, :]
         scores = scores[mask]
@@ -804,8 +811,8 @@ class VoxelPostprocessor(BasePostprocessor):
         # Post-filtering: large boxes, abnormal Z, etc.
         keep_index_1 = box_utils.remove_large_pred_bbx(pred_box3d_tensor, self.dataset)
         
-        z_min = self.params["anchor_args"]["cav_lidar_range"][2]
-        z_max = self.params["anchor_args"]["cav_lidar_range"][5]
+        z_min = self.lidar_range[2]
+        z_max = self.lidar_range[5]
         keep_index_2 = box_utils.remove_bbx_abnormal_z(pred_box3d_tensor, 
                                                        z_min=z_min, z_max=z_max)
         keep_index = torch.logical_and(keep_index_1, keep_index_2)
@@ -826,7 +833,7 @@ class VoxelPostprocessor(BasePostprocessor):
 
         # Filter by range
         mask = box_utils.get_mask_for_boxes_within_range_torch(
-            pred_box3d_tensor, self.params["anchor_args"]["cav_lidar_range"]
+            pred_box3d_tensor, self.lidar_range
         )
         pred_box3d_tensor = pred_box3d_tensor[mask]
         scores = scores[mask]

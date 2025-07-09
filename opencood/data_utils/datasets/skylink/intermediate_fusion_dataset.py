@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # Author: Runsheng Xu <rxx3386@ucla.edu>
 # License: TDG-Attribution-NonCommercial-NoDistrib
-# Modifier: Yuheng Wu <yuhengwu@kaist.ac.kr>
+# Modifier: Yuheng Wu <yuhengwu@kaist.ac.kr>, Xiangbo Gao <xiangbogaobarry@gmail.com>
 
 """
-Dataset class for intermediate fusion
+Dataset class for intermediate fusion for bm2cp
 
 It will project the depth from lidar to image and pad noncover area with predicted depth
 """
@@ -90,20 +90,23 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
 
         self.fov = params["bevcam_fov"]
 
-        self.data_aug_conf = params["fusion"]["args"]["data_aug_conf"]
-        self.grid_conf = params["fusion"]["args"]["grid_conf"]
-        self.depth_discre = camera_utils.depth_discretization(
-            self.grid_conf["ddiscr"][0],
-            self.grid_conf["ddiscr"][1],
-            self.grid_conf["ddiscr"][2],
-            self.grid_conf["mode"],
-        )
+        self.veh_data_aug_conf = params["fusion"]["args"]["veh_data_aug_conf"]
+        self.rsu_data_aug_conf = params["fusion"]["args"]["rsu_data_aug_conf"]
+        self.drone_data_aug_conf = params["fusion"]["args"]["drone_data_aug_conf"]
+        
+        # self.veh_grid_conf = params["fusion"]["args"]["grid_conf"]
+        # self.depth_discre = camera_utils.depth_discretization(
+        #     self.grid_conf["ddiscr"][0],
+        #     self.grid_conf["ddiscr"][1],
+        #     self.grid_conf["ddiscr"][2],
+        #     self.grid_conf["mode"],
+        # )
 
-        if self.use_cam:
-            self.data_aug_conf_cam = params["image_modality"]["data_aug_conf"]
+        # if self.use_cam:
+        #     self.data_aug_conf_cam = params["image_modality"]["data_aug_conf"]
 
-        if self.use_lidar:
-            self.data_aug_conf_lidar = params["lidar_modality"]["data_aug_conf"]
+        # if self.use_lidar:
+        #     self.data_aug_conf_lidar = params["lidar_modality"]["data_aug_conf"]
 
         self.training = train
 
@@ -119,8 +122,19 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
         self.post_processor = post_processor.build_postprocessor(
             params["postprocess"], dataset="skylink", train=train
         )
-
+        
+        if self.ego_type == "vehicle":
+            self.agent_order = ["vehicle", "rsu", "drone"]
+        elif self.ego_type == "rsu":
+            self.agent_order = ["rsu", "vehicle", "drone"]
+        elif self.ego_type == "drone":
+            self.agent_order = ["drone", "vehicle", "rsu"]
+            
+    
     def __getitem__(self, idx):
+        # Default order if none specified
+        agent_order = self.agent_order
+        
         base_data_dict, scenario_index, timestamp_key = self.retrieve_base_data(
             idx, cur_ego_pos_flag=self.cur_ego_pose_flag
         )
@@ -128,450 +142,274 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
         processed_data_dict = OrderedDict()
         processed_data_dict["ego"] = {}
 
+        # Find ego vehicle
         ego_id = -1
         ego_lidar_pose = []
-        # num_cav = 0
-
         for cav_id, cav_content in base_data_dict.items():
             if cav_content["ego"]:
                 ego_id = cav_id
                 ego_lidar_pose = cav_content["params"]["delay_ego_lidar_pose"]
                 break
-
         processed_data_dict["ego"].update({"ego_id": ego_id})
 
-        # =================================================================
-        #                      return data attributes
-        # =================================================================
-        # common for this timestamp
-        object_stack = []
-        object_id_stack = []
-        class_id_stack = []
-        velocity = []
-        time_delay = []
-        infra = []  # YH: we regard rsu and drone as infra
-        spatial_correction_matrix = []
+        # Define agent configurations
+        agent_configs = {
+            "vehicle": {
+                "max_cav": self.max_cav_veh,
+                "com_range": opencood.data_utils.datasets.VEH_COM_RANGE,
+                "infra_value": 0,
+            },
+            "rsu": {
+                "max_cav": self.max_cav_rsu,
+                "com_range": opencood.data_utils.datasets.RSU_COM_RANGE,
+                "infra_value": 1,
+            },
+            "drone": {
+                "max_cav": self.max_cav_drone, 
+                "com_range": opencood.data_utils.datasets.DRONE_COM_RANGE,
+                "infra_value": 1,
+            }
+        }
+        
+        # Initialize data storage for each agent type
+        agent_data = {}
+        for agent_type in agent_configs:
+            agent_data[agent_type] = {
+                **agent_configs[agent_type],
+                "object_stack": [],
+                "object_id_stack": [],
+                "class_id_stack": [],
+                "velocity": [],
+                "time_delay": [],
+                "distance_to_ego": [],
+                "spatial_correction_matrix": [],
+                "processed_lidar_features": [],
+                "cam_inputs": [],
+                "original_lidar_vis": [],
+                "num_agents": 0,
+                "retain_ids": []
+            }
+
         dynamic_seg_label = None
         static_seg_label = None
-
-        # used for temp collection, will be filtered out later
-        object_stack_veh = []
-        object_id_stack_veh = []
-        class_id_stack_veh = []
-        velocity_veh = []
-        time_delay_veh = []
-        num_veh = 0
-        distance_to_ego_veh = []
-        spatial_correction_matrix_veh = []
-
-        object_stack_rsu = []
-        object_id_stack_rsu = []
-        class_id_stack_rsu = []
-        velocity_rsu = []
-        time_delay_rsu = []
-        num_rsu = 0
-        distance_to_ego_rsu = []
-        spatial_correction_matrix_rsu = []
-
-        object_stack_drone = []
-        object_id_stack_drone = []
-        class_id_stack_drone = []
-        velocity_drone = []
-        time_delay_drone = []
-        num_drone = 0
-        distance_to_ego_drone = []
-        spatial_correction_matrix_drone = []
-
-        retain_cav_ids = []
-        # =================================================================
-        #                       retrieve information
-        # =================================================================
-
-        # veh
-        processed_lidar_features_veh_list = []
-        cam_inputs_veh_list = []
-        original_lidar_vis_veh_list = []
-
-        # rsu
-        processed_lidar_features_rsu_list = []
-        cam_inputs_rsu_list = []
-        original_lidar_vis_rsu_list = []
-
-        # drone
-        processed_lidar_features_drone_list = []
-        cam_inputs_drone_list = []
-        original_lidar_vis_drone_list = []
-        
         metadata_path = None
 
-        # loop over all CAVs to process information
+        # Collect data for each agent
         for cav_id, selected_cav_base in base_data_dict.items():
-            # check if the cav is within the communication range with ego
-            distance = selected_cav_base["distance_to_ego"]
             agent_type = selected_cav_base["agent_type"]
-            if (
-                agent_type == "rsu"
-                and distance > opencood.data_utils.datasets.RSU_COM_RANGE
-            ):
+            distance = selected_cav_base["distance_to_ego"]
+            
+            # Skip if out of communication range
+            if distance > agent_data[agent_type]["com_range"]:
                 continue
-            elif (
-                agent_type == "drone"
-                and distance > opencood.data_utils.datasets.DRONE_COM_RANGE
-            ):
-                continue
-            elif (
-                agent_type == "vehicle"
-                and distance > opencood.data_utils.datasets.VEH_COM_RANGE
-            ):
-                continue
-
-            # num_cav += 1
+                
             selected_cav_processed = self.get_item_single_car(
                 selected_cav_base, ego_lidar_pose
             )
-
+            
+            # Add data to the appropriate agent collection
+            current_agent = agent_data[agent_type]
+            
+            current_agent["object_stack"].append(selected_cav_processed["object_bbx_center"])
+            current_agent["object_id_stack"].append(selected_cav_processed["object_ids"])
+            current_agent["class_id_stack"].append(selected_cav_processed["class_ids"])
+            current_agent["velocity"].append(selected_cav_base["params"]["odometry"]["ego_speed"] / 30.0)
+            current_agent["time_delay"].append(float(selected_cav_base["time_delay"]))
+            current_agent["distance_to_ego"].append((cav_id, distance))
+            current_agent["spatial_correction_matrix"].append(selected_cav_base["params"]["spatial_correction_matrix"])
+            current_agent["processed_lidar_features"].append(selected_cav_processed["processed_lidar_features"])
+            current_agent["cam_inputs"].append(selected_cav_processed["cam_inputs"])
+            current_agent["original_lidar_vis"].append(selected_cav_processed["lidar_np"])
+            
+            # Get seg_label from ego vehicle
             if selected_cav_base["ego"]:
+                metadata_path = selected_cav_base["metadata_path"]
                 metadata_path = selected_cav_base["metadata_path"]
                 dynamic_seg_label = selected_cav_base["dynamic_seg_label"]
                 static_seg_label = selected_cav_base["static_seg_label"]
-
-            agent_type = selected_cav_processed["agent_type"]
-            if agent_type == "drone":
-                object_stack_drone.append(selected_cav_processed["object_bbx_center"])
-                object_id_stack_drone.append(selected_cav_processed["object_ids"])
-                class_id_stack_drone.append(selected_cav_processed["class_ids"])
-                # normalize speed as in v2x-r
-                velocity_drone.append(
-                    selected_cav_base["params"]["odometry"]["ego_speed"] / 30.0
+        
+        # Common data collectors for all agent types
+        all_object_stack = []
+        all_object_id_stack = []
+        all_class_id_stack = []
+        all_velocity = []
+        all_time_delay = []
+        all_infra = []
+        all_spatial_correction_matrix = []
+        retain_cav_ids = []
+        
+        # Process each agent type in specified order
+        for agent_type in agent_order:
+            current_agent = agent_data[agent_type]
+            
+            # Skip if no agents of this type
+            if not current_agent["distance_to_ego"]:
+                current_agent["num_agents"] = 0
+                current_agent["merged_lidar_features_dict"] = {}
+                current_agent["merged_cam_inputs_dict"] = {}
+                continue
+            
+            # Filter to closest agents
+            indices, retain_ids = skylink_utils.get_smallest_k_indices(current_agent["distance_to_ego"], current_agent["max_cav"])
+            
+            # Apply filtering to all data fields
+            for field in ["object_stack", "object_id_stack", "class_id_stack", 
+                        "velocity", "time_delay", "spatial_correction_matrix",
+                        "processed_lidar_features", "cam_inputs", "original_lidar_vis"]:
+                current_agent[field] = [current_agent[field][i] for i in indices]
+                if field in ['object_stack', 'object_id_stack', 'class_id_stack']:
+                    current_agent[field] = list(chain.from_iterable(current_agent[field]))
+            
+            # Add to combined data collections in requested order
+            all_object_stack.extend(current_agent["object_stack"])
+            all_object_id_stack.extend(current_agent["object_id_stack"])
+            all_class_id_stack.extend(current_agent["class_id_stack"])
+            all_velocity.extend(current_agent["velocity"])
+            all_time_delay.extend(current_agent["time_delay"])
+            all_infra.extend([current_agent["infra_value"]] * len(indices))
+            all_spatial_correction_matrix.extend(current_agent["spatial_correction_matrix"])
+            
+            retain_cav_ids.extend(retain_ids)
+            current_agent["retain_ids"] = retain_ids
+            current_agent["num_agents"] = len(retain_ids)
+            
+            # Merge features for this agent type if available
+            if current_agent["num_agents"] > 0:
+                current_agent["merged_lidar_features_dict"] = self.merge_features_to_dict(
+                    current_agent["processed_lidar_features"], None, "lidar"
                 )
-                time_delay_drone.append(float(selected_cav_base["time_delay"]))
-
-                distance_to_ego_drone.append((cav_id, distance))
-                num_drone += 1
-
-                processed_lidar_features_drone_list.append(
-                    selected_cav_processed["processed_lidar_features"]
-                )
-                cam_inputs_drone_list.append(selected_cav_processed["cam_inputs"])
-                original_lidar_vis_drone_list.append(selected_cav_processed["lidar_np"])
-                spatial_correction_matrix_drone.append(
-                    selected_cav_base["params"]["spatial_correction_matrix"]
-                )
-
-            elif agent_type == "rsu":
-                object_stack_rsu.append(selected_cav_processed["object_bbx_center"])
-                object_id_stack_rsu.append(selected_cav_processed["object_ids"])
-                class_id_stack_rsu.append(selected_cav_processed["class_ids"])
-                velocity_rsu.append(
-                    selected_cav_base["params"]["odometry"]["ego_speed"] / 30.0
-                )
-                time_delay_rsu.append(float(selected_cav_base["time_delay"]))
-                distance_to_ego_rsu.append((cav_id, distance))
-                num_rsu += 1
-
-                processed_lidar_features_rsu_list.append(
-                    selected_cav_processed["processed_lidar_features"]
-                )
-                cam_inputs_rsu_list.append(selected_cav_processed["cam_inputs"])
-
-                original_lidar_vis_rsu_list.append(selected_cav_processed["lidar_np"])
-                spatial_correction_matrix_rsu.append(
-                    selected_cav_base["params"]["spatial_correction_matrix"]
+                current_agent["merged_cam_inputs_dict"] = self.merge_features_to_dict(
+                    current_agent["cam_inputs"], "stack", "cam"
                 )
             else:
-                # veh
-                object_stack_veh.append(selected_cav_processed["object_bbx_center"])
-                object_id_stack_veh.append(selected_cav_processed["object_ids"])
-                class_id_stack_veh.append(selected_cav_processed["class_ids"])
-                velocity_veh.append(
-                    selected_cav_base["params"]["odometry"]["ego_speed"] / 30.0
-                )
-                time_delay_veh.append(float(selected_cav_base["time_delay"]))
-                distance_to_ego_veh.append((cav_id, distance))
-                num_veh += 1
-
-
-                processed_lidar_features_veh_list.append(
-                    selected_cav_processed["processed_lidar_features"]
-                )
-                cam_inputs_veh_list.append(selected_cav_processed["cam_inputs"])
-                original_lidar_vis_veh_list.append(selected_cav_processed["lidar_np"])
-                spatial_correction_matrix_veh.append(
-                    selected_cav_base["params"]["spatial_correction_matrix"]
-                )
-
-        # ========================================================================
-        # remove out of max agents
-        # metric: distance to ego, priortize the closer ones
-        # in some cases, there is possible that missing  rsu/drone
-        # when encounter num_rsu/drone == 0, handle differently
-        # ========================================================================
-
-        # veh
-        veh_indices, retain_veh_ids = skylink_utils.get_smallest_k_indices(
-            distance_to_ego_veh, self.max_cav_veh
-        )
-        object_stack_veh = [object_stack_veh[i] for i in veh_indices]
-        object_id_stack_veh = [object_id_stack_veh[i] for i in veh_indices]
-        class_id_stack_veh = [class_id_stack_veh[i] for i in veh_indices]
-
-        velocity_veh = [velocity_veh[i] for i in veh_indices]
-        velocity += velocity_veh
-        time_delay_veh = [time_delay_veh[i] for i in veh_indices]
-        time_delay += time_delay_veh
-        infra += [0 for _ in veh_indices]
-        spatial_correction_matrix += [
-            spatial_correction_matrix_veh[i] for i in veh_indices
-        ]
-
-        processed_lidar_features_veh_list = [
-            processed_lidar_features_veh_list[i] for i in veh_indices
-        ]
-        cam_inputs_veh_list = [cam_inputs_veh_list[i] for i in veh_indices]
-        original_lidar_vis_veh_list = [
-            original_lidar_vis_veh_list[i] for i in veh_indices
-        ]
-        retain_cav_ids += retain_veh_ids
-        num_veh = len(retain_veh_ids)
-
-        # rsu
-        # TODO(YH): shuffle the order here, make it maintained
-        rsu_indices, retain_rsu_ids = skylink_utils.get_smallest_k_indices(
-            distance_to_ego_rsu, self.max_cav_rsu
-        )
-        object_stack_rsu = [object_stack_rsu[i] for i in rsu_indices]
-        object_id_stack_rsu = [object_id_stack_rsu[i] for i in rsu_indices]
-        class_id_stack_rsu = [class_id_stack_rsu[i] for i in rsu_indices]
-
-        velocity_rsu = [velocity_rsu[i] for i in rsu_indices]
-        velocity += velocity_rsu
-        time_delay_rsu = [time_delay_rsu[i] for i in rsu_indices]
-        time_delay += time_delay_rsu
-        infra += [1 for _ in rsu_indices]
-        spatial_correction_matrix += [
-            spatial_correction_matrix_rsu[i] for i in rsu_indices
-        ]
-
-        processed_lidar_features_rsu_list = [
-            processed_lidar_features_rsu_list[i] for i in rsu_indices
-        ]
-        cam_inputs_rsu_list = [cam_inputs_rsu_list[i] for i in rsu_indices]
-        original_lidar_vis_rsu_list = [
-            original_lidar_vis_rsu_list[i] for i in rsu_indices
-        ]
-        retain_cav_ids += retain_rsu_ids
-        num_rsu = len(retain_rsu_ids)
-
-        # drone
-        drone_indices, retain_drone_ids = skylink_utils.get_smallest_k_indices(
-            distance_to_ego_drone, self.max_cav_drone
-        )
-        object_stack_drone = [object_stack_drone[i] for i in drone_indices]
-        object_id_stack_drone = [object_id_stack_drone[i] for i in drone_indices]
-        class_id_stack_drone = [class_id_stack_drone[i] for i in drone_indices]
-
-        velocity_drone = [velocity_drone[i] for i in drone_indices]
-        velocity += velocity_drone
-        time_delay_drone = [time_delay_drone[i] for i in drone_indices]
-        time_delay += time_delay_drone
-        infra += [1 for _ in drone_indices]
-        spatial_correction_matrix += [
-            spatial_correction_matrix_drone[i] for i in drone_indices
-        ]
-
-        processed_lidar_features_drone_list = [
-            processed_lidar_features_drone_list[i] for i in drone_indices
-        ]
-        cam_inputs_drone_list = [cam_inputs_drone_list[i] for i in drone_indices]
-        original_lidar_vis_drone_list = [
-            original_lidar_vis_drone_list[i] for i in drone_indices
-        ]
-        retain_cav_ids += retain_drone_ids
-        num_drone = len(retain_drone_ids)
-
-        # clean visible objects
-        object_stack = list(
-            chain.from_iterable(
-                object_stack_veh + object_stack_rsu + object_stack_drone
-            )
-        )
-        object_id_stack = list(
-            chain.from_iterable(
-                object_id_stack_veh + object_id_stack_rsu + object_id_stack_drone
-            )
-        )
-        class_id_stack = list(
-            chain.from_iterable(
-                class_id_stack_veh + class_id_stack_rsu + class_id_stack_drone
-            )
-        )
-        # NOTE(YH): set() may shuffle the order, so avoid use set()
-        # retain_cav_ids = list(set(retain_cav_ids))
+                current_agent["merged_lidar_features_dict"] = {}
+                current_agent["merged_cam_inputs_dict"] = {}
+        
+        # Ensure unique IDs (preserve order)
         retain_cav_ids = list(unique_everseen(retain_cav_ids))
-
+        
+        # Get pairwise transformation matrix
         retain_base_data_dict = OrderedDict(
-            (retain_cav_id, base_data_dict[retain_cav_id])
-            for retain_cav_id in retain_cav_ids
+            (cav_id, base_data_dict[cav_id]) for cav_id in retain_cav_ids
         )
-        # base_data_dict = {
-        #     cav_id: base_data_dict[cav_id] for cav_id in retain_cav_ids
-        # }  # in the order [veh, rsu, drone]
-
-        # ============================================================================
-        # get the pairwise transformation matrix
-        # ============================================================================
-
-        pairwise_t_matrix_collab, img_pairwise_t_matrix_collab = (
-            self.get_pairwise_transformation(
-                retain_base_data_dict, self.max_cav_num, self.collaborators
-            )
+        
+        pairwise_t_matrix_collab, img_pairwise_t_matrix_collab = self.get_pairwise_transformation(
+            retain_base_data_dict, self.max_cav_num, self.collaborators
         )
-
-        # pad dv, dt, infra to max_cav_num
-        velocity = velocity + (self.max_cav_num - len(velocity)) * [0.0]
-        time_delay = time_delay + (self.max_cav_num - len(time_delay)) * [0.0]
-        infra = infra + (self.max_cav_num - len(infra)) * [0.0]
-        spatial_correction_matrix = np.stack(spatial_correction_matrix)
+        
+        # Pad to max_cav_num
+        all_velocity = all_velocity + (self.max_cav_num - len(all_velocity)) * [0.0]
+        all_time_delay = all_time_delay + (self.max_cav_num - len(all_time_delay)) * [0.0]
+        all_infra = all_infra + (self.max_cav_num - len(all_infra)) * [0.0]
+        
+        # Process spatial correction matrix
+        try:
+            all_spatial_correction_matrix = np.stack(all_spatial_correction_matrix)
+        except:
+            import traceback; traceback.print_exc()
+            import pdb; pdb.set_trace()
         padding_eye = np.tile(
-            np.eye(4)[None], (self.max_cav_num - len(spatial_correction_matrix), 1, 1)
+            np.eye(4)[None], (self.max_cav_num - len(all_spatial_correction_matrix), 1, 1)
         )
-        spatial_correction_matrix = np.concatenate(
-            [spatial_correction_matrix, padding_eye], axis=0
+        all_spatial_correction_matrix = np.concatenate(
+            [all_spatial_correction_matrix, padding_eye], axis=0
         )
-
-        # ============================================================================
-        # merge the features
-        # ============================================================================
-
-        # we always have at least one ego veh, so we ensure veh here
-        merged_processed_lidar_dict_veh = self.merge_features_to_dict(
-            processed_lidar_features_veh_list,
-            None,
-            "lidar",  # here, the voxel has been projected with self.proj_first so that they can be merged
-        )
-        merged_cam_inputs_dict_veh = self.merge_features_to_dict(
-            cam_inputs_veh_list, "stack", "cam"
-        )
-
-        # handle cases when no rsu/drone
-        merged_processed_lidar_dict_rsu = (
-            self.merge_features_to_dict(
-                processed_lidar_features_rsu_list, None, "lidar"
-            )
-            if num_rsu > 0
-            else {}
-        )
-        merged_cam_inputs_dict_rsu = (
-            self.merge_features_to_dict(cam_inputs_rsu_list, "stack", "cam")
-            if num_rsu > 0
-            else {}
-        )
-        # drone
-        merged_processed_lidar_dict_drone = (
-            self.merge_features_to_dict(
-                processed_lidar_features_drone_list, None, "lidar"
-            )
-            if num_drone > 0
-            else {}
-        )
-        merged_cam_inputs_dict_drone = (
-            self.merge_features_to_dict(cam_inputs_drone_list, "stack", "cam")
-            if num_drone > 0
-            else {}
-        )
-
-        # exclude all repetitive objects
-        # NOTE: don't use set() which may shuffle the order
-        unique_elements = list(unique_everseen(object_id_stack))
-        unique_indices = [object_id_stack.index(x) for x in unique_elements]
-
-        object_stack = np.vstack(object_stack)
+        
+        # Process object data (remove duplicates)
+        unique_elements = list(unique_everseen(all_object_id_stack))
+        unique_indices = [all_object_id_stack.index(x) for x in unique_elements]
+        
+        try:
+            
+            if len(all_object_stack):
+                object_stack = np.vstack(all_object_stack)
+            else:
+                object_stack = np.zeros((0, 7))
+        except:
+            import traceback; traceback.print_exc()
+            import pdb; pdb.set_trace()
+        
         object_stack = object_stack[unique_indices]
-
-        ret_class_ids = class_id_stack
-        class_id_stack = np.array(class_id_stack)
-        class_id_stack = class_id_stack[unique_indices]
-
-        # make sure bbx across all frames have the same number
+        
+        ret_class_ids = all_class_id_stack
+        all_class_id_stack = np.array(all_class_id_stack)
+        all_class_id_stack = all_class_id_stack[unique_indices]
+        
+        # Create padded object boxes and mask
         object_bbx_center = np.zeros((self.params["postprocess"]["max_num"], 7))
         mask = np.zeros(self.params["postprocess"]["max_num"])
         object_bbx_center[: object_stack.shape[0], :] = object_stack
         mask[: object_stack.shape[0]] = 1
-
-        # pad class_ids to max num
-        class_ids_padded = np.full(
-            self.params["postprocess"]["max_num"], 0
-        )  # pad 0 as "background"
-        class_ids_padded[: object_stack.shape[0]] = class_id_stack
-
-        # generate the anchor boxes
+        
+        # Pad class IDs
+        class_ids_padded = np.full(self.params["postprocess"]["max_num"], 0)
+        class_ids_padded[: object_stack.shape[0]] = all_class_id_stack
+        
+        # Generate labels
         anchor_box = self.post_processor.generate_anchor_box()
-
-        # generate targets label
         label_dict = self.post_processor.generate_label_skylink(
             gt_box_center=object_bbx_center,
             anchors=anchor_box,
             mask=mask,
             class_ids_padded=class_ids_padded,
         )
-
-        # NOTE(YH): use for debug
-        # skylink_utils.visualize_cls_labels_bev(label_dict["cls_labels"])
-        # skylink_utils.visualize_cls_labels_bev(label_dict["cls_labels"])
-
+        
         assert dynamic_seg_label is not None, "seg_label should not be None"
         assert static_seg_label is not None, "seg_label should not be None"
-
-        processed_data_dict["ego"].update(
-            {
-                # common
-                "object_bbx_center": object_bbx_center,
-                "object_bbx_mask": mask,
-                "object_ids": [object_id_stack[i] for i in unique_indices],
-                "class_ids": [ret_class_ids[i] for i in unique_indices],
-                "dynamic_seg_label": dynamic_seg_label,
-                "static_seg_label": static_seg_label,
-                "anchor_box": anchor_box,
-                "num_cavs": num_veh + num_rsu + num_drone,
-                "num_veh": num_veh,
-                "num_rsu": num_rsu,
-                "num_drone": num_drone,
-                "label_dict": label_dict,
-                "pairwise_t_matrix_collab": pairwise_t_matrix_collab,
-                "img_pairwise_t_matrix_collab": img_pairwise_t_matrix_collab,
-                "spatial_correction_matrix": spatial_correction_matrix,
-                "velocity": velocity,
-                "time_delay": time_delay,
-                "infra": infra,
-                "original_lidar_vis_veh_list": original_lidar_vis_veh_list,
-                "original_lidar_vis_rsu_list": original_lidar_vis_rsu_list,
-                # veh
-                "processed_lidar_features_veh_list": processed_lidar_features_veh_list,
-                "merged_lidar_features_dict_veh": merged_processed_lidar_dict_veh,
-                "cam_inputs_veh": cam_inputs_veh_list,
-                "merged_cam_inputs_dict_veh": merged_cam_inputs_dict_veh,
-                # rsu
-                "processed_lidar_features_rsu_list": processed_lidar_features_rsu_list,
-                "merged_lidar_features_dict_rsu": merged_processed_lidar_dict_rsu,
-                "cam_inputs_rsu": cam_inputs_rsu_list,
-                "merged_cam_inputs_dict_rsu": merged_cam_inputs_dict_rsu,
-                # drone
-                "processed_lidar_features_drone_list": processed_lidar_features_drone_list,
-                "merged_lidar_features_dict_drone": merged_processed_lidar_dict_drone,
-                "cam_inputs_drone": cam_inputs_drone_list,
-                "merged_cam_inputs_dict_drone": merged_cam_inputs_dict_drone,
-                # vis
-                "origin_lidar_veh": np.concatenate(original_lidar_vis_veh_list, axis=0),
-                "origin_lidar_rsu": np.concatenate(original_lidar_vis_rsu_list, axis=0) if len(original_lidar_vis_rsu_list) > 0 else np.zeros((0,4)),
-                "origin_lidar_drone": np.concatenate(original_lidar_vis_drone_list, axis=0) if len(original_lidar_vis_drone_list) > 0 else np.zeros((0,4)),
-                # meta
-                "scenario_index": scenario_index,
-                "timestamp_key": timestamp_key,
-                "metadata_path": metadata_path,
-                "ego_lidar_pose": ego_lidar_pose,
+        
+        # Build final output dictionary
+        total_agents = sum(agent_data[agent_type]["num_agents"] for agent_type in agent_order)
+        
+        processed_data_dict["ego"].update({
+            # Common data
+            "object_bbx_center": object_bbx_center,
+            "object_bbx_mask": mask,
+            "object_ids": [all_object_id_stack[i] for i in unique_indices],
+            "class_ids": [ret_class_ids[i] for i in unique_indices],
+            "dynamic_seg_label": dynamic_seg_label,
+            "static_seg_label": static_seg_label,
+            "anchor_box": anchor_box,
+            "num_cavs": total_agents,
+            "label_dict": label_dict,
+            "pairwise_t_matrix_collab": pairwise_t_matrix_collab,
+            "img_pairwise_t_matrix_collab": img_pairwise_t_matrix_collab,
+            "spatial_correction_matrix": all_spatial_correction_matrix,
+            "velocity": all_velocity,
+            "time_delay": all_time_delay,
+            "infra": all_infra,
+            "scenario_index": scenario_index,
+            "timestamp_key": timestamp_key,
+            "metadata_path": metadata_path,
+            "ego_lidar_pose": ego_lidar_pose,
+        })
+        
+        # Add agent-specific data
+        for agent_type in agent_order:
+            current_agent = agent_data[agent_type]
+            
+            type_abb_map = {
+                "vehicle": "veh",
+                "rsu": "rsu",
+                "drone": "drone"
             }
-        )
+            # Add count and data lists
+            processed_data_dict["ego"][f"num_{type_abb_map[agent_type]}"] = current_agent["num_agents"]
+            processed_data_dict["ego"][f"processed_lidar_features_{type_abb_map[agent_type]}_list"] = current_agent["processed_lidar_features"]
+            processed_data_dict["ego"][f"merged_lidar_features_dict_{type_abb_map[agent_type]}"] = current_agent["merged_lidar_features_dict"]
+            processed_data_dict["ego"][f"cam_inputs_{type_abb_map[agent_type]}"] = current_agent["cam_inputs"]
+            processed_data_dict["ego"][f"merged_cam_inputs_dict_{type_abb_map[agent_type]}"] = current_agent["merged_cam_inputs_dict"]
+            processed_data_dict["ego"][f"original_lidar_vis_{type_abb_map[agent_type]}_list"] = current_agent["original_lidar_vis"]
+            
+            # Add concatenated lidar data if available
+            if current_agent["num_agents"] > 0:
+                processed_data_dict["ego"][f"origin_lidar_{type_abb_map[agent_type]}"] = np.concatenate(
+                    current_agent["original_lidar_vis"], axis=0
+                )
+            else:
+                processed_data_dict["ego"][f"origin_lidar_{type_abb_map[agent_type]}"] = np.zeros((0, 4))
+        
         return processed_data_dict
+
 
     def mask_ego_fov_flag(self, selected_cav_base, lidar, ego_params):
         """
@@ -635,6 +473,7 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
                 [selected_cav_base], ego_pose
             )
         )
+        
         agent_type = selected_cav_base["agent_type"]
         selected_cav_processed.update({"agent_type": agent_type})
         
@@ -668,18 +507,25 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
             post_tran = torch.zeros(2)
             if depth_data_list:
                 depth_img = camera_utils.decode_depth_carla(depth_data_list[idx], to_PIL=True)
+                # import pdb; pdb.set_trace()
                 img_src = [img, depth_img]
             else:
                 img_src = [img]
                 
-            # import pdb; pdb.set_trace()
-            # depth_img_bk = depth_img
-            # depth_img = np.clip(np.array(depth_img_bk),0, 16776/4); cv2.imwrite("/home/xiangbog/Folder/Research/SkyLink/skylink/debug/debug_image_v2.png", ((depth_img - depth_img.min()) / (depth_img.max() - depth_img.min()) * 255).astype(np.uint8),)
-            # depth_img = depth_img_bk
             
-            resize, resize_dims, crop, flip, rotate = camera_utils.sample_augmentation(
-                self.data_aug_conf, self.train
-            )
+            if agent_type == "vehicle":
+                resize, resize_dims, crop, flip, rotate = camera_utils.sample_augmentation(
+                    self.veh_data_aug_conf, self.train
+                )
+            elif agent_type == "rsu":
+                resize, resize_dims, crop, flip, rotate = camera_utils.sample_augmentation(
+                    self.rsu_data_aug_conf, self.train
+                )
+            elif agent_type == "drone":
+                resize, resize_dims, crop, flip, rotate = camera_utils.sample_augmentation(
+                    self.drone_data_aug_conf, self.train
+                )
+            
             img_src, post_rot2, post_tran2 = camera_utils.img_transform(
                 img_src,
                 post_rot,
@@ -691,6 +537,7 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
                 rotate=rotate,
             )
             
+            
             post_tran = torch.zeros(3)
             post_rot = torch.eye(3)
             post_tran[:2] = post_tran2
@@ -698,13 +545,9 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
 
             img_src[0] = camera_utils.normalize_img(img_src[0])
             if depth_data_list:
-                img_src[1] = camera_utils.pil_depth_to_tensor(img_src[1]).unsqueeze(0)
-            # import pdb; pdb.set_trace()
-            # depth_img_bk = img_src[1]
-            # img_src[1] = np.array(img_src[1]); img_src[1] = img_src[1][0]
-            # img_src[1] = img_src[1][0]
-            # # img_src[1] = np.array(img_src[1]); img_src[1] = img_src[1][0]; cv2.imwrite("/home/xiangbog/Folder/Research/SkyLink/skylink/debug/debug_image_v3.png", ((img_src[1] - img_src[1].min()) / (img_src[1].max() - img_src[1].min()) * 255).astype(np.uint8),)
+                img_src[1] = camera_utils.pil_depth_to_tensor(img_src[-1]).unsqueeze(0)
                 
+
             imgs.append(torch.cat(img_src, dim=0))
             intrins.append(intrin)
             extrinsics.append(torch.from_numpy(camera_to_lidar))
@@ -746,7 +589,6 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
         lidar_np = mask_points_by_range(
             lidar_np, self.params["preprocess"]["cav_lidar_range"]
         )
-
         processed_lidar = self.pre_processor.preprocess(lidar_np)
 
         selected_cav_processed.update(
@@ -847,17 +689,19 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
             spatial_correction_matrix_list.append(ego_dict["spatial_correction_matrix"])
 
             # veh
-            processed_lidar_features_veh_lists.append(
-                ego_dict["processed_lidar_features_veh_list"]
-            )
-            merged_lidar_features_dict_veh_list.append(
-                ego_dict["merged_lidar_features_dict_veh"]
-            )
-            cam_inputs_veh_list.append(ego_dict["cam_inputs_veh"])
-            merged_cam_inputs_dict_veh_list.append(
-                ego_dict["merged_cam_inputs_dict_veh"]
-            )
-            batch_idxs_veh.append(i)
+            if ego_dict["num_veh"] > 0:
+                processed_lidar_features_veh_lists.append(
+                    ego_dict["processed_lidar_features_veh_list"]
+                )
+                merged_lidar_features_dict_veh_list.append(
+                    ego_dict["merged_lidar_features_dict_veh"]
+                )
+                cam_inputs_veh_list.append(ego_dict["cam_inputs_veh"])
+                merged_cam_inputs_dict_veh_list.append(
+                    ego_dict["merged_cam_inputs_dict_veh"]
+                )
+                batch_idxs_veh.append(i)
+                
             # rsu
             if ego_dict["num_rsu"] > 0:
                 processed_lidar_features_rsu_lists.append(
@@ -871,6 +715,7 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
                     ego_dict["merged_cam_inputs_dict_rsu"]
                 )
                 batch_idxs_rsu.append(i)
+                
             # drone
             if ego_dict["num_drone"] > 0:
                 processed_lidar_features_drone_lists.append(
@@ -887,14 +732,7 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
 
             # vis
             origin_lidar_veh_list.append(ego_dict["origin_lidar_veh"])
-            origin_lidar_rsu_list.append(ego_dict["origin_lidar_rsu"])
-            origin_lidar_drone_list.append(ego_dict["origin_lidar_drone"])
-            
-            # metadata
-            scenario_index_list.append(ego_dict["scenario_index"])
-            timestamp_key_list.append(ego_dict["timestamp_key"])
-            metadata_path_list.append(ego_dict["metadata_path"])
-            ego_lidar_pose_list.append(ego_dict["ego_lidar_pose"])
+            # origin_lidar_rsu_list.append(ego_dict["origin_lidar_rsu"])
 
         dynamic_seg_label_torch = torch.from_numpy(np.array(dynamic_seg_label_list))
         static_seg_label_torch = torch.from_numpy(np.array(static_seg_label_list))
@@ -927,8 +765,10 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
         
 
         # at least we have one ego veh
-        batch_merged_lidar_features_veh_torch = self.pre_processor.collate_batch(
-            batch_merged_lidar_features_veh
+        batch_merged_lidar_features_veh_torch = (
+            self.pre_processor.collate_batch(batch_merged_lidar_features_veh)
+            if len(merged_lidar_features_dict_veh_list) > 0
+            else None
         )
 
         batch_merged_lidar_features_rsu_torch = (
@@ -1024,13 +864,6 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
             output_dict["ego"].update({"origin_lidar": origin_lidars_veh})
             output_dict["ego"].update({"origin_lidar_rsu": origin_lidars_rsu})
             output_dict["ego"].update({"origin_lidar_drone": origin_lidars_drone})
-            
-
-            # origin_lidars_rsu = np.array(
-            #     downsample_lidar_minimum(pcd_np_list=origin_lidar_rsu_list)
-            # )
-            # origin_lidars_rsu = torch.from_numpy(origin_lidars_rsu)
-            # output_dict["ego"].update({"origin_lidars_rsu": origin_lidars_rsu})
 
         return output_dict
 
@@ -1079,6 +912,7 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
             self.post_processor.post_process_skylink(data_dict, output_dict)
         )
         gt_box_tensor, gt_class_label_list, gt_track_list = self.post_processor.generate_gt_bbx_skylink(data_dict)
+        gt_box_tensor, gt_class_label_list, gt_track_list = self.post_processor.generate_gt_bbx_skylink(data_dict)
 
         return pred_box_tensor, pred_score, pred_labels, pred_boxes3d, gt_box_tensor, gt_class_label_list, gt_track_list
     
@@ -1107,6 +941,8 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
 
         return pred_dynamic_seg_map, pred_static_seg_map, gt_dynamic_seg_map, gt_static_seg_map
 
+    
+    
     def get_pairwise_transformation(self, base_data_dict, max_cav, cop_agent_type):
         """
         Get pair-wise transformation matrix accross different agents.

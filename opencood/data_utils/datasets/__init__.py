@@ -49,9 +49,6 @@ from opencood.data_utils.datasets.opv2v.lidar_camera_intermediate_fusion_dataset
 from opencood.data_utils.datasets.skylink.early_fusion_dataset import (
     EarlyFusionDatasetSkylink,
 )
-from opencood.data_utils.datasets.skylink.intermediate_fusion_dataset_heal import (
-    IntermediateFusionDatasetSkylinkHEAL,
-)
 from opencood.data_utils.datasets.skylink.intermediate_fusion_dataset import (
     IntermediateFusionDatasetSkylink,
 )
@@ -82,7 +79,6 @@ __all__ = {
     "IntermediateFusionDatasetSkylink": IntermediateFusionDatasetSkylink,
     "IntermediateFusionDatasetSkylinkBM2CP": IntermediateFusionDatasetSkylinkBM2CP,
     "IntermediateFusionDatasetSkylinkSiCP": IntermediateFusionDatasetSkylinkSiCP,
-    "IntermediateFusionDatasetSkylinkHEAL": IntermediateFusionDatasetSkylinkHEAL,
 }
 
 # the final range for evaluation

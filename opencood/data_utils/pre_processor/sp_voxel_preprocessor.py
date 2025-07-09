@@ -27,8 +27,13 @@ class SpVoxelPreprocessor(BasePreprocessor):
             from spconv.utils import Point2VoxelCPU3d as VoxelGenerator
 
             self.spconv = 2
-
-        self.lidar_range = self.params["cav_lidar_range"]
+        ego_type = self.params["ego_type"]
+        if ego_type == "vehicle":
+            self.lidar_range = self.params["cav_lidar_range"]
+        elif ego_type == "rsu":
+            self.lidar_range = self.params["rsu_lidar_range"]
+        elif ego_type == "drone":
+            self.lidar_range = self.params["drone_lidar_range"]
         self.voxel_size = self.params["args"]["voxel_size"]
         self.max_points_per_voxel = self.params["args"]["max_points_per_voxel"]
 
@@ -64,6 +69,7 @@ class SpVoxelPreprocessor(BasePreprocessor):
         
         if len(pcd_np) == 0:
             pcd_np = np.zeros((1, 4), dtype=np.float32)
+            pcd_np = np.array([-0.218277, -5.13425732, -0.05884552, 1.230595649e-38], dtype=np.float32).reshape(1, 4)
             # Drone mode will remove the dummpy points that is too close to the origin, so we add a dummy point lower.
             pcd_np = np.array([-0.218277, -11.13425732, -80.05884552, 1.230595649e-38], dtype=np.float32).reshape(1, 4)
             print("Warning: empty point cloud, add dummy points")
