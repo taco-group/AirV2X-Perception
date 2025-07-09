@@ -40,7 +40,10 @@ def init_distributed_mode(args):
         world_size=args.world_size,
         rank=args.rank,
     )
-    torch.distributed.barrier()
+    
+    print("before")
+    torch.distributed.barrier(device_ids=[args.gpu])
+    print("after")
     setup_for_distributed(args.rank == 0)
 
 

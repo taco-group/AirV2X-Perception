@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Author: Runsheng Xu <rxx3386@ucla.edu>
-# License: TDG-Attribution-NonCommercial-NoDistrib
 # Modifier: Yuheng Wu <yuhengwu@kaist.ac.kr>, Xiangbo Gao <xiangbogaobarry@gmail.com>
+# License: TDG-Attribution-NonCommercial-NoDistrib
 
 """
 Dataset class for intermediate fusion for bm2cp
@@ -22,6 +22,7 @@ import matplotlib
 import numpy as np
 import torch
 import cv2
+from collections import defaultdict
 
 import opencood.data_utils.datasets
 import opencood.data_utils.post_processor as post_processor
@@ -585,10 +586,15 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
             lidar_np[:, :3] = box_utils.project_points_by_matrix_torch(
                 lidar_np[:, :3], transformation_matrix
             )
-        
         lidar_np = mask_points_by_range(
             lidar_np, self.params["preprocess"]["cav_lidar_range"]
         )
+        
+        # Note: Here we handle the case of empty lidar points (mostly due to system error).
+        # No supervision under such case.
+        if len(lidar_np) == 0:
+            object_bbx_mask = np.zeros_like(object_bbx_mask)
+            
         processed_lidar = self.pre_processor.preprocess(lidar_np)
 
         selected_cav_processed.update(
@@ -600,8 +606,6 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
                 "class_ids": class_ids,
             }
         )
-
-
         return selected_cav_processed
 
     def collate_batch_train(self, batch):
@@ -867,6 +871,253 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
 
         return output_dict
 
+
+
+
+
+    # def collate_batch_train(self, batch):
+    #     """
+    #     Collate function with inline profiling.  
+    #     日志格式: [collate] <阶段名称> ...... <耗时>s
+    #     """
+    #     # ---------- 简易计时工具 ----------
+    #     t0 = time.perf_counter()
+    #     def log(stage: str):
+    #         nonlocal t0
+    #         now = time.perf_counter()
+    #         print(f"[collate] {stage:<40} {now - t0:7.3f}s")
+    #         t0 = now
+    #     # ---------------------------------
+
+    #     output_dict = {"ego": {}}
+
+    #     # ---------- 1. 预分配容器 ----------
+    #     object_bbx_center, object_bbx_mask = [], []
+    #     object_ids, class_ids = [], []
+    #     record_len = []
+    #     record_len_veh, record_len_rsu, record_len_drone = [], [], []
+    #     label_dict_list, anchor_box_list = [], []
+    #     pairwise_t_matrix_collab_list, img_pairwise_t_matrix_collab_list = [], []
+    #     dynamic_seg_label_list, static_seg_label_list = [], []
+
+    #     velocity, time_delay, infra = [], [], []
+    #     spatial_correction_matrix_list = []
+
+    #     processed_lidar_features_veh_lists, merged_lidar_features_dict_veh_list = [], []
+    #     cam_inputs_veh_list, merged_cam_inputs_dict_veh_list, batch_idxs_veh = [], [], []
+
+    #     processed_lidar_features_rsu_lists, merged_lidar_features_dict_rsu_list = [], []
+    #     cam_inputs_rsu_list, merged_cam_inputs_dict_rsu_list, batch_idxs_rsu = [], [], []
+
+    #     processed_lidar_features_drone_lists, merged_lidar_features_dict_drone_list = [], []
+    #     cam_inputs_drone_list, merged_cam_inputs_dict_drone_list, batch_idxs_drone = [], [], []
+
+    #     origin_lidar_veh_list, origin_lidar_rsu_list, origin_lidar_drone_list = [], [], []
+
+    #     scenario_index_list, timestamp_key_list = [], []
+    #     metadata_path_list, ego_lidar_pose_list = [], []
+    #     log("init containers")
+    #     # ---------------------------------
+
+    #     # ---------- 2. 遍历 batch ----------
+    #     for i, sample in enumerate(batch):
+    #         ego_dict = sample["ego"]
+
+    #         # 基础字段
+    #         object_bbx_center.append(ego_dict["object_bbx_center"])
+    #         object_bbx_mask.append(ego_dict["object_bbx_mask"])
+    #         object_ids.append(ego_dict["object_ids"])
+    #         class_ids.append(ego_dict["class_ids"])
+    #         dynamic_seg_label_list.append(ego_dict["dynamic_seg_label"])
+    #         static_seg_label_list.append(ego_dict["static_seg_label"])
+    #         anchor_box_list.append(ego_dict["anchor_box"])
+    #         record_len.append(ego_dict["num_cavs"])
+    #         record_len_veh.append(ego_dict["num_veh"])
+    #         record_len_rsu.append(ego_dict["num_rsu"])
+    #         record_len_drone.append(ego_dict["num_drone"])
+    #         label_dict_list.append(ego_dict["label_dict"])
+    #         pairwise_t_matrix_collab_list.append(ego_dict["pairwise_t_matrix_collab"])
+    #         img_pairwise_t_matrix_collab_list.append(
+    #             ego_dict["img_pairwise_t_matrix_collab"]
+    #         )
+
+    #         velocity.append(ego_dict["velocity"])
+    #         time_delay.append(ego_dict["time_delay"])
+    #         infra.append(ego_dict["infra"])
+    #         spatial_correction_matrix_list.append(ego_dict["spatial_correction_matrix"])
+
+    #         # veh
+    #         if ego_dict["num_veh"] > 0:
+    #             processed_lidar_features_veh_lists.append(
+    #                 ego_dict["processed_lidar_features_veh_list"]
+    #             )
+    #             merged_lidar_features_dict_veh_list.append(
+    #                 ego_dict["merged_lidar_features_dict_veh"]
+    #             )
+    #             cam_inputs_veh_list.append(ego_dict["cam_inputs_veh"])
+    #             merged_cam_inputs_dict_veh_list.append(
+    #                 ego_dict["merged_cam_inputs_dict_veh"]
+    #             )
+    #             batch_idxs_veh.append(i)
+
+    #         # rsu
+    #         if ego_dict["num_rsu"] > 0:
+    #             processed_lidar_features_rsu_lists.append(
+    #                 ego_dict["processed_lidar_features_rsu_list"]
+    #             )
+    #             merged_lidar_features_dict_rsu_list.append(
+    #                 ego_dict["merged_lidar_features_dict_rsu"]
+    #             )
+    #             cam_inputs_rsu_list.append(ego_dict["cam_inputs_rsu"])
+    #             merged_cam_inputs_dict_rsu_list.append(
+    #                 ego_dict["merged_cam_inputs_dict_rsu"]
+    #             )
+    #             batch_idxs_rsu.append(i)
+
+    #         # drone
+    #         if ego_dict["num_drone"] > 0:
+    #             processed_lidar_features_drone_lists.append(
+    #                 ego_dict["processed_lidar_features_drone_list"]
+    #             )
+    #             merged_lidar_features_dict_drone_list.append(
+    #                 ego_dict["merged_lidar_features_dict_drone"]
+    #             )
+    #             cam_inputs_drone_list.append(ego_dict["cam_inputs_drone"])
+    #             merged_cam_inputs_dict_drone_list.append(
+    #                 ego_dict["merged_cam_inputs_dict_drone"]
+    #             )
+    #             batch_idxs_drone.append(i)
+
+    #         # vis
+    #         origin_lidar_veh_list.append(ego_dict["origin_lidar_veh"])
+    #     log("loop over batch")
+    #     # ---------------------------------
+
+    #     # ---------- 3. numpy → torch ----------
+    #     dynamic_seg_label_torch = torch.from_numpy(np.array(dynamic_seg_label_list))
+    #     static_seg_label_torch  = torch.from_numpy(np.array(static_seg_label_list))
+    #     object_bbx_center       = torch.from_numpy(np.array(object_bbx_center))
+    #     object_bbx_mask         = torch.from_numpy(np.array(object_bbx_mask))
+    #     log("to torch (basic tensors)")
+    #     # ---------------------------------
+
+    #     # ---------- 4. merge features ----------
+    #     batch_merged_lidar_features_veh  = self.merge_features_to_dict(
+    #         merged_lidar_features_dict_veh_list, None, "lidar"
+    #     )
+    #     batch_merged_cam_inputs_veh      = self.merge_features_to_dict(
+    #         merged_cam_inputs_dict_veh_list, "cat", "cam"
+    #     )
+    #     batch_merged_lidar_features_rsu  = self.merge_features_to_dict(
+    #         merged_lidar_features_dict_rsu_list, None, "lidar"
+    #     )
+    #     batch_merged_cam_inputs_rsu      = self.merge_features_to_dict(
+    #         merged_cam_inputs_dict_rsu_list, "cat", "cam"
+    #     )
+    #     batch_merged_lidar_features_drone = self.merge_features_to_dict(
+    #         merged_lidar_features_dict_drone_list, None, "lidar"
+    #     )
+    #     batch_merged_cam_inputs_drone     = self.merge_features_to_dict(
+    #         merged_cam_inputs_dict_drone_list, "cat", "cam"
+    #     )
+    #     log("merge feature dicts")
+    #     # ---------------------------------
+
+    #     # ---------- 5. pre-process (collate) ----------
+    #     batch_merged_lidar_features_veh_torch = (
+    #         self.pre_processor.collate_batch(batch_merged_lidar_features_veh)
+    #         if merged_lidar_features_dict_veh_list else None
+    #     )
+    #     batch_merged_lidar_features_rsu_torch = (
+    #         self.pre_processor.collate_batch(batch_merged_lidar_features_rsu)
+    #         if merged_lidar_features_dict_rsu_list else None
+    #     )
+    #     batch_merged_lidar_features_drone_torch = (
+    #         self.pre_processor.collate_batch(batch_merged_lidar_features_drone)
+    #         if merged_lidar_features_dict_drone_list else None
+    #     )
+    #     log("preprocess.collate_batch")
+    #     # ---------------------------------
+
+    #     # ---------- 6. 其余 tensor 构造 ----------
+    #     label_dict_torch = self.post_processor.collate_batch_skylink(label_dict_list)
+    #     label_dict_torch.update({
+    #         "dynamic_seg_label": dynamic_seg_label_torch,
+    #         "static_seg_label" : static_seg_label_torch,
+    #     })
+
+    #     pairwise_t_matrix_collab_torch = torch.from_numpy(
+    #         np.array(pairwise_t_matrix_collab_list)
+    #     ).float()
+    #     img_pairwise_t_matrix_collab_torch = torch.from_numpy(
+    #         np.array(img_pairwise_t_matrix_collab_list)
+    #     ).float()
+
+    #     record_len      = torch.from_numpy(np.array(record_len,      dtype=np.int32))
+    #     record_len_veh  = torch.from_numpy(np.array(record_len_veh,  dtype=np.int32))
+    #     record_len_rsu  = torch.from_numpy(np.array(record_len_rsu,  dtype=np.int32))
+    #     record_len_drone= torch.from_numpy(np.array(record_len_drone,dtype=np.int32))
+
+    #     velocity = torch.from_numpy(np.array(velocity))
+    #     time_delay = torch.from_numpy(np.array(time_delay))
+    #     infra = torch.from_numpy(np.array(infra))
+    #     spatial_correction_matrix_list = torch.from_numpy(
+    #         np.array(spatial_correction_matrix_list)
+    #     )
+
+    #     prior_encoding = torch.stack([velocity, time_delay, infra], dim=-1).float()
+    #     log("build remaining tensors")
+    #     # ---------------------------------
+
+    #     # ---------- 7. 填充 output_dict ----------
+    #     output_dict["ego"].update({
+    #         "object_bbx_center": object_bbx_center,
+    #         "object_bbx_mask"  : object_bbx_mask,
+    #         "label_dict"       : label_dict_torch,
+    #         "object_ids"       : object_ids,
+    #         "class_ids"        : class_ids,
+    #         "record_len"       : record_len,
+    #         "pairwise_t_matrix_collab"   : pairwise_t_matrix_collab_torch,
+    #         "img_pairwise_t_matrix_collab": img_pairwise_t_matrix_collab_torch,
+    #         "prior_encoding"   : prior_encoding,
+    #         "spatial_correction_matrix": spatial_correction_matrix_list,
+
+    #         "vehicle": {
+    #             "batch_merged_lidar_features_torch": batch_merged_lidar_features_veh_torch,
+    #             "batch_merged_cam_inputs"          : batch_merged_cam_inputs_veh,
+    #             "record_len"                       : record_len_veh,
+    #             "batch_idxs"                       : batch_idxs_veh,
+    #         },
+    #         "rsu": {
+    #             "batch_merged_lidar_features_torch": batch_merged_lidar_features_rsu_torch,
+    #             "batch_merged_cam_inputs"          : batch_merged_cam_inputs_rsu,
+    #             "record_len"                       : record_len_rsu,
+    #             "batch_idxs"                       : batch_idxs_rsu,
+    #         },
+    #         "drone": {
+    #             "batch_merged_lidar_features_torch": batch_merged_lidar_features_drone_torch,
+    #             "batch_merged_cam_inputs"          : batch_merged_cam_inputs_drone,
+    #             "record_len"                       : record_len_drone,
+    #             "batch_idxs"                       : batch_idxs_drone,
+    #         },
+    #         "scenario_index_list": scenario_index_list,
+    #         "timestamp_key_list" : timestamp_key_list,
+    #         "metadata_path_list" : metadata_path_list,
+    #         "ego_lidar_pose_list": ego_lidar_pose_list,
+    #     })
+
+    #     # 可视化附加
+    #     if self.visualize:
+    #         origin_lidars_veh = torch.from_numpy(
+    #             np.array(downsample_lidar_minimum(pcd_np_list=origin_lidar_veh_list))
+    #         )
+    #         output_dict["ego"]["origin_lidar"] = origin_lidars_veh
+    #     log("build output_dict")
+    #     # ---------------------------------
+
+    #     log("TOTAL")
+    #     return output_dict
+
     def collate_batch_test(self, batch):
         assert len(batch) <= 1, "Batch size 1 is required during testing!"
         output_dict = self.collate_batch_train(batch)
@@ -1000,59 +1251,104 @@ class IntermediateFusionDatasetSkylink(basedataset.BaseDataset):
         else:
             return pairwise_t_matrix, pairwise_t_matrix
 
+    # @staticmethod
+    # def merge_features_to_dict(processed_feature_list, merge=None, sensor="lidar"):
+    #     """
+    #     Merge the preprocessed features from different cavs to the same
+    #     dictionary.
+
+    #     Parameters
+    #     ----------
+    #     processed_feature_list : list
+    #         A list of dictionary containing all processed features from
+    #         different cavs.
+
+    #     Returns
+    #     -------
+    #     merged_feature_dict: dict
+    #         key: feature names, value: list of features.
+    #     """
+
+    #     merged_feature_dict = OrderedDict()
+
+    #     if sensor == "lidar":
+    #         for i in range(len(processed_feature_list)):
+    #             for feature_name, feature in processed_feature_list[i].items():
+    #                 if feature_name not in merged_feature_dict:
+    #                     merged_feature_dict[feature_name] = []
+    #                 if isinstance(feature, list):
+    #                     merged_feature_dict[feature_name] += feature
+    #                 else:
+    #                     merged_feature_dict[feature_name].append(feature)
+    #         return merged_feature_dict
+
+    #     elif sensor == "cam":
+    #         for i in range(len(processed_feature_list)):
+    #             for feature_name, feature in processed_feature_list[i].items():
+    #                 if feature_name not in merged_feature_dict:
+    #                     merged_feature_dict[feature_name] = []
+    #                 if isinstance(feature, list):
+    #                     merged_feature_dict[feature_name] += feature
+    #                 else:
+    #                     merged_feature_dict[feature_name].append(feature)
+
+    #         # stack them
+    #         # it usually happens when merging cavs images -> v.shape = [N, Ncam, C, H, W]
+    #         # cat them
+    #         # it usually happens when merging batches cav images -> v is a list [(N1+N2+...Nn, Ncam, C, H, W))]
+    #         if merge == "stack":
+    #             for feature_name, features in merged_feature_dict.items():
+    #                 merged_feature_dict[feature_name] = torch.stack(features, dim=0)
+    #         elif merge == "cat":
+    #             for feature_name, features in merged_feature_dict.items():
+    #                 merged_feature_dict[feature_name] = torch.cat(features, dim=0)
+
+    #         return merged_feature_dict
+
+
     @staticmethod
     def merge_features_to_dict(processed_feature_list, merge=None, sensor="lidar"):
         """
-        Merge the preprocessed features from different cavs to the same
-        dictionary.
+        Merge pre-processed features from multiple CAVs into a single dictionary.
 
         Parameters
         ----------
-        processed_feature_list : list
-            A list of dictionary containing all processed features from
-            different cavs.
+        processed_feature_list : list[dict]
+            Each element is a dict of features for one CAV.
+        merge : {None, "stack", "cat"}, optional
+            For camera data:
+                * None   – keep each value as a list of tensors.
+                * "stack" – torch.stack() over dim 0.
+                * "cat"   – torch.cat()   over dim 0.
+            Ignored for lidar data (always kept as lists).
+        sensor : {"lidar", "cam"}
+            Sensor type that determines how features are merged.
 
         Returns
         -------
-        merged_feature_dict: dict
-            key: feature names, value: list of features.
+        dict
+            Keys are feature names. Values are lists or tensors depending on
+            `sensor` and `merge`.
         """
+        if not processed_feature_list:          # Empty input → empty dict
+            return {}
 
-        merged_feature_dict = OrderedDict()
+        # 1) Collect features: defaultdict avoids repeated key checks
+        buckets = defaultdict(list)
+        for cav_feat in processed_feature_list:          # outer loop: CAVs
+            for name, feat in cav_feat.items():          # inner loop: features
+                buckets[name].extend(feat if isinstance(feat, list) else [feat])
 
-        if sensor == "lidar":
-            for i in range(len(processed_feature_list)):
-                for feature_name, feature in processed_feature_list[i].items():
-                    if feature_name not in merged_feature_dict:
-                        merged_feature_dict[feature_name] = []
-                    if isinstance(feature, list):
-                        merged_feature_dict[feature_name] += feature
-                    else:
-                        merged_feature_dict[feature_name].append(feature)
-            return merged_feature_dict
+        # 2) Lidar: return lists directly; Cam: optionally stack/cat
+        if sensor == "lidar" or merge is None:
+            return buckets
 
-        elif sensor == "cam":
-            for i in range(len(processed_feature_list)):
-                for feature_name, feature in processed_feature_list[i].items():
-                    if feature_name not in merged_feature_dict:
-                        merged_feature_dict[feature_name] = []
-                    if isinstance(feature, list):
-                        merged_feature_dict[feature_name] += feature
-                    else:
-                        merged_feature_dict[feature_name].append(feature)
+        if merge == "stack":
+            return {k: torch.stack(v, dim=0) for k, v in buckets.items()}
+        if merge == "cat":
+            return {k: torch.cat(v, dim=0) for k, v in buckets.items()}
 
-            # stack them
-            # it usually happens when merging cavs images -> v.shape = [N, Ncam, C, H, W]
-            # cat them
-            # it usually happens when merging batches cav images -> v is a list [(N1+N2+...Nn, Ncam, C, H, W))]
-            if merge == "stack":
-                for feature_name, features in merged_feature_dict.items():
-                    merged_feature_dict[feature_name] = torch.stack(features, dim=0)
-            elif merge == "cat":
-                for feature_name, features in merged_feature_dict.items():
-                    merged_feature_dict[feature_name] = torch.cat(features, dim=0)
-
-            return merged_feature_dict
+        raise ValueError("merge must be None, 'stack', or 'cat'")
 
 
 if __name__ == "__main__":

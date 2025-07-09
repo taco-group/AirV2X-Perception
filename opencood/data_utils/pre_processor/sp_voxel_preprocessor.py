@@ -13,6 +13,7 @@ import torch
 from cumm import tensorview as tv
 
 from opencood.data_utils.pre_processor.base_preprocessor import BasePreprocessor
+from typing import Sequence, Mapping, Dict
 
 
 class SpVoxelPreprocessor(BasePreprocessor):
@@ -67,11 +68,14 @@ class SpVoxelPreprocessor(BasePreprocessor):
     def preprocess(self, pcd_np):
         data_dict = {}
         
+        # Note: Here we handle the case of empty lidar points (mostly due to system error).
+        # Add dummpy point clouds. This will essentially ignore this sample in the training 
+        # since we will also mask the gt bbox in this case.
         if len(pcd_np) == 0:
-            pcd_np = np.zeros((1, 4), dtype=np.float32)
-            pcd_np = np.array([-0.218277, -5.13425732, -0.05884552, 1.230595649e-38], dtype=np.float32).reshape(1, 4)
+            pcd_np1 = np.zeros((1, 4), dtype=np.float32)
             # Drone mode will remove the dummpy points that is too close to the origin, so we add a dummy point lower.
-            pcd_np = np.array([-0.218277, -11.13425732, -80.05884552, 1.230595649e-38], dtype=np.float32).reshape(1, 4)
+            pcd_np2 = np.array([-0.218277, -11.13425732, -80.05884552, 1.230595649e-38], dtype=np.float32).reshape(1, 4)
+            pcd_np = np.concatenate((pcd_np1, pcd_np2), axis=0)
             print("Warning: empty point cloud, add dummy points")
             
         
@@ -122,71 +126,54 @@ class SpVoxelPreprocessor(BasePreprocessor):
         else:
             sys.exit("Batch has too be a list or a dictionarn")
 
-    @staticmethod
-    def collate_batch_list(batch):
-        """
-        Customized pytorch data loader collate function.
 
-        Parameters
-        ----------
-        batch : list
-            List of dictionary. Each dictionary represent a single frame.
+
+    def collate_batch(self, batch):
+        """
+        Collate function for a list-of-dict or dict-of-list batch.
+
+        Accepted input
+        --------------
+        list  : [ {'voxel_features': ..., 'voxel_coords': ..., ...}, … ]
+        dict  : { 'voxel_features': [arr0, arr1, …], 'voxel_coords': [...] }
 
         Returns
         -------
-        processed_batch : dict
-            Updated lidar batch.
+        dict with torch.Tensor values.
         """
-        voxel_features = []
-        voxel_num_points = []
-        voxel_coords = []
+        if isinstance(batch, Sequence):           # list‐of‐dict
+            batch = _transpose_to_dict(batch)
+        elif not isinstance(batch, Mapping):      # neither list nor dict
+            raise TypeError("batch must be list or dict, got {}".format(type(batch)))
 
-        for i in range(len(batch)):
-            voxel_features.append(batch[i]["voxel_features"])
-            voxel_num_points.append(batch[i]["voxel_num_points"])
-            coords = batch[i]["voxel_coords"]
-            voxel_coords.append(
-                np.pad(coords, ((0, 0), (1, 0)), mode="constant", constant_values=i)
-            )
+        vf   = torch.from_numpy(np.concatenate(batch["voxel_features"]))
+        vnp  = torch.from_numpy(np.concatenate(batch["voxel_num_points"]))
 
-        voxel_num_points = torch.from_numpy(np.concatenate(voxel_num_points))
-        voxel_features = torch.from_numpy(np.concatenate(voxel_features))
-        voxel_coords = torch.from_numpy(np.concatenate(voxel_coords))
+        # add batch-index as leading column in coords (vectorised)
+        coords_with_idx = np.concatenate(
+            [
+                np.hstack((np.full((c.shape[0], 1), i, dtype=c.dtype), c))
+                for i, c in enumerate(batch["voxel_coords"])
+            ],
+            axis=0,
+        )
+        vc = torch.from_numpy(coords_with_idx)
 
-        return {
-            "voxel_features": voxel_features,
-            "voxel_coords": voxel_coords,
-            "voxel_num_points": voxel_num_points,
-        }
+        return {"voxel_features": vf,
+                "voxel_coords":   vc,
+                "voxel_num_points": vnp}
 
-    @staticmethod
-    def collate_batch_dict(batch: dict):
+
+    # ------------------------------------------------------------------
+    # helpers
+    # ------------------------------------------------------------------
+    def _transpose_to_dict(batch_list: Sequence[Dict]) -> Dict[str, list]:
         """
-        Collate batch if the batch is a dictionary,
-        eg: {'voxel_features': [feature1, feature2...., feature n]}
-
-        Parameters
-        ----------
-        batch : dict
-
-        Returns
-        -------
-        processed_batch : dict
-            Updated lidar batch.
+        Turn list-of-dict into dict-of-list *without extra copies*.
         """
-        voxel_features = torch.from_numpy(np.concatenate(batch["voxel_features"]))
-        voxel_num_points = torch.from_numpy(np.concatenate(batch["voxel_num_points"]))
-        coords = batch["voxel_coords"]
-        voxel_coords = []
-
-        for i in range(len(coords)):
-            voxel_coords.append(
-                np.pad(coords[i], ((0, 0), (1, 0)), mode="constant", constant_values=i)
-            )
-        voxel_coords = torch.from_numpy(np.concatenate(voxel_coords))
-
-        return {
-            "voxel_features": voxel_features,
-            "voxel_coords": voxel_coords,
-            "voxel_num_points": voxel_num_points,
-        }
+        keys = batch_list[0].keys()
+        out  = {k: [] for k in keys}
+        for sample in batch_list:
+            for k in keys:
+                out[k].append(sample[k])
+        return out

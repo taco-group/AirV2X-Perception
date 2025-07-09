@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Author: Runsheng Xu <rxx3386@ucla.edu>, Hao Xiang <haxiang@g.ucla.edu>
+# Modifier: Yuheng Wu <yuhengwu@kaist.ac.kr>, Xiangbo Gao <xiangbogaobarry@gmail.com>
 # License: TDG-Attribution-NonCommercial-NoDistrib
 
 
@@ -220,7 +221,7 @@ def load_cross_modal_point_pillar_params(param):
     return param
 
 
-def load_skylink_v2vnet_params(param):
+def load_airv2x_params(param):
     """
     Based on the lidar range and resolution of voxel, calcuate the anchor box
     and target resolution.

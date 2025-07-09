@@ -41,7 +41,7 @@ def train_parser():
     )
     parser.add_argument("--rank", default=0, type=int)
     parser.add_argument("--tag", default="default")
-    parser.add_argument("--worker", default=8, type=int)
+    parser.add_argument("--worker", default=16, type=int)
     opt = parser.parse_args()
     return opt
 
@@ -57,29 +57,29 @@ def main():
 
     if opt.distributed:
         sampler_train = DistributedSampler(opencood_train_dataset)
-        sampler_val = DistributedSampler(opencood_validate_dataset, shuffle=False)
-
         batch_sampler_train = torch.utils.data.BatchSampler(
-            sampler_train, hypes["train_params"]["batch_size"], drop_last=True
+            sampler_train,
+            hypes["train_params"]["batch_size"],
+            drop_last=True,
         )
 
         train_loader = DataLoader(
             opencood_train_dataset,
             batch_sampler=batch_sampler_train,
             num_workers=opt.worker,
-            timeout=1800,
             collate_fn=opencood_train_dataset.collate_batch_train,
-            shuffle=False,
+            timeout=1800,
             pin_memory=True,
             prefetch_factor=1,
         )
+
+        sampler_val = DistributedSampler(opencood_validate_dataset, shuffle=False)
         val_loader = DataLoader(
             opencood_validate_dataset,
             sampler=sampler_val,
             num_workers=opt.worker,
             collate_fn=opencood_validate_dataset.collate_batch_train,
             timeout=1800,
-            shuffle=False,
             pin_memory=True,
             prefetch_factor=1,
         )
@@ -89,7 +89,7 @@ def main():
             batch_size=hypes["train_params"]["batch_size"],
             num_workers=opt.worker,
             collate_fn=opencood_train_dataset.collate_batch_train,
-            shuffle=False,
+            shuffle=True,
             pin_memory=True,
             drop_last=True,
             prefetch_factor=4,
