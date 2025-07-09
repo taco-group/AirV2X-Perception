@@ -1,0 +1,12 @@
+# ninja log v5
+3	1874	1745983752390243326	/home/xiangbog/Folder/Research/skylink/skylink-cood/build/temp.linux-x86_64-3.7/opencood/pcdet_utils/iou3d_nms/src/iou3d_nms_kernel.o	ead39a34de2ab808
+0	16551	1745983767049080776	/home/xiangbog/Folder/Research/skylink/skylink-cood/build/temp.linux-x86_64-3.7/opencood/pcdet_utils/iou3d_nms/src/iou3d_cpu.o	6fa0f4bfc56e665
+1	17716	1745983768217067824	/home/xiangbog/Folder/Research/skylink/skylink-cood/build/temp.linux-x86_64-3.7/opencood/pcdet_utils/iou3d_nms/src/iou3d_nms_api.o	b95f71d59ca07bd1
+2	18495	1745983768993059219	/home/xiangbog/Folder/Research/skylink/skylink-cood/build/temp.linux-x86_64-3.7/opencood/pcdet_utils/iou3d_nms/src/iou3d_nms.o	4c3a0016749a971e
+4	581	1745983770183046024	/home/xiangbog/Folder/Research/skylink/skylink-cood/build/temp.linux-x86_64-3.7/opencood/pcdet_utils/roiaware_pool3d/src/roiaware_pool3d_kernel.o	f9c13f8223c7650c
+3	18197	1745983787778850905	/home/xiangbog/Folder/Research/skylink/skylink-cood/build/temp.linux-x86_64-3.7/opencood/pcdet_utils/roiaware_pool3d/src/roiaware_pool3d.o	fb8c31978130ac69
+4	19163	1745983807587631247	/home/xiangbog/Folder/Research/skylink/skylink-cood/build/temp.linux-x86_64-3.7/opencood/pcdet_utils/pointnet2/pointnet2_stack/src/pointnet2_api.o	f28bd04aa715b080
+19	20000	1745983808420622010	/home/xiangbog/Folder/Research/skylink/skylink-cood/build/temp.linux-x86_64-3.7/opencood/pcdet_utils/pointnet2/pointnet2_stack/src/group_points_gpu.o	c5d771f768f7eb9e
+12	20470	1745983808892616776	/home/xiangbog/Folder/Research/skylink/skylink-cood/build/temp.linux-x86_64-3.7/opencood/pcdet_utils/pointnet2/pointnet2_stack/src/ball_query_gpu.o	c0ff84c0ef632e96
+22	20672	1745983809104614425	/home/xiangbog/Folder/Research/skylink/skylink-cood/build/temp.linux-x86_64-3.7/opencood/pcdet_utils/pointnet2/pointnet2_stack/src/sampling_gpu.o	6853b54c0e4fa7e9
+23	20982	1745983809411611021	/home/xiangbog/Folder/Research/skylink/skylink-cood/build/temp.linux-x86_64-3.7/opencood/pcdet_utils/pointnet2/pointnet2_stack/src/interpolate_gpu.o	4857c880dafbac17
