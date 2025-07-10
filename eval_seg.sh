@@ -10,8 +10,8 @@ GPUS=(
 
 # Corresponding model directories
 MODEL_DIRS=(
-  "opencood/logs/skylink_intermediate_v2xvit_seg/default__2025_05_10_14_38_09/"
-  "opencood/logs/skylink_intermediate_where2com_seg/default__2025_05_10_14_48_27"
+  "opencood/logs/airv2x_intermediate_v2xvit_seg/default__2025_05_10_14_38_09/"
+  "opencood/logs/airv2x_intermediate_where2com_seg/default__2025_05_10_14_48_27"
 )
 
 # Evaluation epochs for each model
@@ -23,7 +23,7 @@ EPOCHS=(
 # Loop over indices of the arrays
 for i in "${!MODEL_DIRS[@]}"; do
   export CUDA_VISIBLE_DEVICES="${GPUS[i]}"
-  python opencood/tools/inference_skylink_seg.py \
+  python opencood/tools/inference_airv2x_seg.py \
     --model_dir "${MODEL_DIRS[i]}" \
     --save_vis 1 \
     --eval_epoch "${EPOCHS[i]}" > \

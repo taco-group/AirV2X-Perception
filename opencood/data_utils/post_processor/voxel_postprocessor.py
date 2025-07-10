@@ -219,7 +219,7 @@ class VoxelPostprocessor(BasePostprocessor):
 
         return label_dict
 
-    def generate_label_skylink(self, **kwargs):
+    def generate_label_airv2x(self, **kwargs):
         """
         Generate targets for training.
 
@@ -394,7 +394,7 @@ class VoxelPostprocessor(BasePostprocessor):
         }
 
     @staticmethod
-    def collate_batch_skylink(label_batch_list):
+    def collate_batch_airv2x(label_batch_list):
         """
         Customized collate function for target label generation.
 
@@ -668,7 +668,7 @@ class VoxelPostprocessor(BasePostprocessor):
             pred_box_tensor, gt_tensor, pcd, show_vis, save_path
         )
 
-    def post_process_skylink(self, data_dict, output_dict):
+    def post_process_airv2x(self, data_dict, output_dict):
         """
         Process the outputs of the model to 2D/3D bounding box.
         Step1: convert each cav's output to bounding box format
@@ -844,7 +844,7 @@ class VoxelPostprocessor(BasePostprocessor):
         return pred_box3d_tensor, scores, labels, boxes3d
     
 
-    def post_process_segmentation_skylink(self, data_dict, output_dict):
+    def post_process_segmentation_airv2x(self, data_dict, output_dict):
         pred_dynamic_seg_map = output_dict["ego"]["dynamic_seg"]
         pred_static_seg_map = output_dict["ego"]["static_seg"]
 

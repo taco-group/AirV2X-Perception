@@ -573,7 +573,7 @@ def project_world_objects(
             output_dict.update({object_id: bbx_lidar})
 
 
-def project_world_objects_skylink(
+def project_world_objects_airv2x(
     object_dict, output_dict, lidar_pose, lidar_range, order, dataset, enlarge_z=False
 ):
     """
@@ -608,7 +608,7 @@ def project_world_objects_skylink(
         # rotation = object_content['angle']
         rotation = angle
 
-        class_id = object_content["class"]  # skylink use multi-class
+        class_id = object_content["class"]  # airv2x use multi-class
 
         center = object_content["center"]
         extent = object_content["extent"]

@@ -20,7 +20,7 @@ from opencood.models.sub_modules.lss_submodule import (
     CamEncode,
     CamEncode_Resnet101,
 )
-from opencood.utils import skylink_utils
+from opencood.utils import airv2x_utils
 from opencood.utils.camera_utils import (
     QuickCumsum,
     bin_depths,
@@ -867,7 +867,7 @@ class LiftSplatShootEncoder(nn.Module):
         x = self.bevencode(x)  # 用resnet18提取特征  x: 4 x C x 240 x 240
         x_3d = x.unsqueeze(2)
         num_drones = x.shape[0]
-        mock_lidar = skylink_utils.mock_lidar_for_drone(num_drones, x.device)
+        mock_lidar = airv2x_utils.mock_lidar_for_drone(num_drones, x.device)
 
         # intra fusion
         pc_dict, thres_map, mask, each_mask = self.intra_fusion(x_3d, mock_lidar)

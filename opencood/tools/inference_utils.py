@@ -178,10 +178,10 @@ def save_prediction_gt(pred_tensor, gt_tensor, pcd, timestamp, save_path):
 
 
 # ====================================================================================================
-# skylink: (1) multiclass (2) segmentation (3) tracking
+# airv2x: (1) multiclass (2) segmentation (3) tracking
 # ====================================================================================================
 
-def inference_intermediate_fusion_skylink(batch_data, model, dataset):
+def inference_intermediate_fusion_airv2x(batch_data, model, dataset):
     """
     Model inference for early fusion.
 
@@ -199,10 +199,10 @@ def inference_intermediate_fusion_skylink(batch_data, model, dataset):
         The tensor of gt bounding box.
     """
 
-    return inference_early_fusion_skylink(batch_data, model, dataset)
+    return inference_early_fusion_airv2x(batch_data, model, dataset)
 
 
-def inference_early_fusion_skylink(batch_data, model, dataset):
+def inference_early_fusion_airv2x(batch_data, model, dataset):
     """
     Model inference for early fusion.
 
@@ -232,7 +232,7 @@ def inference_early_fusion_skylink(batch_data, model, dataset):
 
 
 # segmentation
-def inference_intermediate_fusion_skylink_segmentation(batch_data, model, dataset):
+def inference_intermediate_fusion_airv2x_segmentation(batch_data, model, dataset):
     """
     Model inference for early fusion.
 
@@ -250,10 +250,10 @@ def inference_intermediate_fusion_skylink_segmentation(batch_data, model, datase
         The tensor of gt bounding box.
     """
 
-    return inference_early_fusion_skylink_segmentation(batch_data, model, dataset)
+    return inference_early_fusion_airv2x_segmentation(batch_data, model, dataset)
 
 
-def inference_early_fusion_skylink_segmentation(batch_data, model, dataset):
+def inference_early_fusion_airv2x_segmentation(batch_data, model, dataset):
     """
     Model inference for early fusion.
 
@@ -281,7 +281,7 @@ def inference_early_fusion_skylink_segmentation(batch_data, model, dataset):
     return pred_dynamic_seg_map, pred_static_seg_map, gt_dynamic_seg_map, gt_static_seg_map
 
 
-def save_preds_skylink(pred_box_tensor, pred_score, pred_boxes3d, batch_data, save_path, pred_labels=0):
+def save_preds_airv2x(pred_box_tensor, pred_score, pred_boxes3d, batch_data, save_path, pred_labels=0):
     # if type(pred_box_tensor) == torch.Tensor:
     #     pred_box_tensor = torch_tensor_to_numpy(pred_box_tensor)
     if type(pred_score) == torch.Tensor:

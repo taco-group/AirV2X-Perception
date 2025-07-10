@@ -299,7 +299,7 @@ def load_airv2x_params(param):
     return param
 
 
-def load_skylink_bm2cp_params(param):
+def load_airv2x_bm2cp_params(param):
     """
     Based on the lidar range and resolution of voxel, calcuate the anchor box
     and target resolution.

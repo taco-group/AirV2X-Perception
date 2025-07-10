@@ -115,7 +115,7 @@ def visualize_bev_points(points, batch_idx=0, camera_idx=None, max_points=10000)
     plt.title('Side View (Y-Z plane)')
     
     plt.tight_layout()
-    plt.savefig('/home/xiangbog/Folder/Research/SkyLink/skylink/debug/bev_visualization.png', dpi=300)
+    plt.savefig('/home/xiangbog/Folder/Research/SkyLink/airv2x/debug/bev_visualization.png', dpi=300)
 
 def visualize_cameras_frustum(points, batch_idx=0):
     """Visualize the frustum of each camera in 3D space"""
@@ -185,7 +185,7 @@ def visualize_cameras_frustum(points, batch_idx=0):
     ax.set_ylim(mid_y - max_range, mid_y + max_range)
     ax.set_zlim(mid_z - max_range, mid_z + max_range)
     
-    plt.savefig('/home/xiangbog/Folder/Research/SkyLink/skylink/debug/camera_frustums.png', dpi=300)
+    plt.savefig('/home/xiangbog/Folder/Research/SkyLink/airv2x/debug/camera_frustums.png', dpi=300)
 
 def visualize_density(points, batch_idx=0, camera_idx=None, grid_res=0.5):
     """
@@ -250,4 +250,4 @@ def visualize_density(points, batch_idx=0, camera_idx=None, grid_res=0.5):
     plt.grid(True)
     
     plt.tight_layout()
-    plt.savefig('/home/xiangbog/Folder/Research/SkyLink/skylink/debug/density_visualization.png', dpi=300)
+    plt.savefig('/home/xiangbog/Folder/Research/SkyLink/airv2x/debug/density_visualization.png', dpi=300)

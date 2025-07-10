@@ -46,17 +46,17 @@ from opencood.data_utils.datasets.opv2v.lidar_camera_intermediate_fusion_dataset
 from opencood.data_utils.datasets.opv2v.lidar_camera_intermediate_fusion_dataset_v2 import (
     LiDARCameraIntermediateFusionDataset as LiDARCameraIntermediateFusionDatasetOPV2V_V2,
 )
-from opencood.data_utils.datasets.skylink.early_fusion_dataset import (
-    EarlyFusionDatasetSkylink,
+from opencood.data_utils.datasets.airv2x.early_fusion_dataset import (
+    EarlyFusionDatasetAirv2x,
 )
-from opencood.data_utils.datasets.skylink.intermediate_fusion_dataset import (
-    IntermediateFusionDatasetSkylink,
+from opencood.data_utils.datasets.airv2x.intermediate_fusion_dataset import (
+    IntermediateFusionDatasetAirv2x,
 )
-from opencood.data_utils.datasets.skylink.intermediate_fusion_dataset_bm2cp import (
-    IntermediateFusionDatasetSkylinkBM2CP,
+from opencood.data_utils.datasets.airv2x.intermediate_fusion_dataset_bm2cp import (
+    IntermediateFusionDatasetAirv2xBM2CP,
 )
-from opencood.data_utils.datasets.skylink.intermediate_fusion_dataset_sicp import (
-    IntermediateFusionDatasetSkylinkSiCP,
+from opencood.data_utils.datasets.airv2x.intermediate_fusion_dataset_sicp import (
+    IntermediateFusionDatasetAirv2xSiCP,
 )
 
 __all__ = {
@@ -75,10 +75,10 @@ __all__ = {
     "LateFusionDatasetDAIR": LateFusionDatasetDAIR,
     "LiDARCameraIntermediateFusionDatasetDAIR": LiDARCameraIntermediateFusionDatasetDAIR,
     "LiDARCameraIntermediateFusionDatasetDAIR_V2": LiDARCameraIntermediateFusionDatasetDAIR_V2,
-    "EarlyFusionDatasetSkylink": EarlyFusionDatasetSkylink,
-    "IntermediateFusionDatasetSkylink": IntermediateFusionDatasetSkylink,
-    "IntermediateFusionDatasetSkylinkBM2CP": IntermediateFusionDatasetSkylinkBM2CP,
-    "IntermediateFusionDatasetSkylinkSiCP": IntermediateFusionDatasetSkylinkSiCP,
+    "EarlyFusionDatasetAirv2x": EarlyFusionDatasetAirv2x,
+    "IntermediateFusionDatasetAirv2x": IntermediateFusionDatasetAirv2x,
+    "IntermediateFusionDatasetAirv2xBM2CP": IntermediateFusionDatasetAirv2xBM2CP,
+    "IntermediateFusionDatasetAirv2xSiCP": IntermediateFusionDatasetAirv2xSiCP,
 }
 
 # the final range for evaluation

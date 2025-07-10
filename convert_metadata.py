@@ -27,5 +27,5 @@ def convert_yaml_to_pickle(root_dir):
 
 
 # Example usage
-root_folder = "/code/dataset/skylink"
+root_folder = "/code/dataset/airv2x"
 convert_yaml_to_pickle(root_folder)

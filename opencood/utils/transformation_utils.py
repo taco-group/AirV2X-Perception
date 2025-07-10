@@ -505,7 +505,7 @@ def rot_and_trans_to_trasnformation_matrix(lidar2camera_json_file):
     return matrix
 
 
-# add for skylink
+# add for airv2x
 def relative_tfm_x1_to_x2(x1_rel, x1_center, x2_rel, x2_center):
     T_x1_rel2center = pose_to_tfm(np.array([x1_rel]))[0]
     T_x1_center2world = pose_to_tfm(np.array([x1_center]))[0]
@@ -526,7 +526,7 @@ def relative_tfm_x1_to_x2(x1_rel, x1_center, x2_rel, x2_center):
 def get_abs_world_pose(rel_pose, center_pose):
     """convert the relative sensor position to world pose.
 
-    In skylink, the pose of sensors are relative to its attach objects
+    In airv2x, the pose of sensors are relative to its attach objects
     """
     rel_x, rel_y, rel_z, rel_roll, rel_yaw, rel_pitch = rel_pose[:]
     x, y, z, roll, yaw, pitch = center_pose[:]

@@ -89,7 +89,7 @@ def main():
     if opt.comm_thre is not None:
         hypes["model"]["args"]["fusion_args"]["communication"]["thre"] = opt.comm_thre
 
-    if "opv2v" or "V2XR" or "skylink" in opt.model_dir:
+    if "opv2v" or "V2XR" or "airv2x" in opt.model_dir:
         from opencood.utils import eval_utils_opv2v as eval_utils
 
         left_hand = True
@@ -216,8 +216,8 @@ def main():
             )
             
             if opt.save_pred:
-                # Saving prediction as skylink data format.
-                inference_utils.save_preds_skylink(pred_box_tensor, pred_score, pred_boxes3d, batch_data, saved_path)
+                # Saving prediction as airv2x data format.
+                inference_utils.save_preds_airv2x(pred_box_tensor, pred_score, pred_boxes3d, batch_data, saved_path)
                 
                 
 

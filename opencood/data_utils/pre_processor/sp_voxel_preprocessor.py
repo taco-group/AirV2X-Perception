@@ -14,7 +14,16 @@ from cumm import tensorview as tv
 
 from opencood.data_utils.pre_processor.base_preprocessor import BasePreprocessor
 from typing import Sequence, Mapping, Dict
+import warnings
 
+class EmptyPointCloudWarning(UserWarning):
+    pass
+
+warnings.filterwarnings(
+    "once",
+    category=EmptyPointCloudWarning,
+    message=r"^Warning: empty point cloud"
+)
 
 class SpVoxelPreprocessor(BasePreprocessor):
     def __init__(self, preprocess_params, train):
@@ -76,7 +85,12 @@ class SpVoxelPreprocessor(BasePreprocessor):
             # Drone mode will remove the dummpy points that is too close to the origin, so we add a dummy point lower.
             pcd_np2 = np.array([-0.218277, -11.13425732, -80.05884552, 1.230595649e-38], dtype=np.float32).reshape(1, 4)
             pcd_np = np.concatenate((pcd_np1, pcd_np2), axis=0)
-            print("Warning: empty point cloud, add dummy points")
+            # print("Warning: empty point cloud, add dummy points")
+            with warnings.catch_warnings():
+                warnings.warn("Add dummy points. "
+                              "This is because of some package loss during the data collection. "
+                              "It will be solved in the future dataset version.", 
+                              EmptyPointCloudWarning)
             
         
         if self.spconv == 1:

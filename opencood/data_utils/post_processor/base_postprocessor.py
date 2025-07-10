@@ -10,7 +10,7 @@ import numpy as np
 import torch
 
 from opencood.utils import box_utils, common_utils
-from opencood.utils.skylink_utils import get_bevcam_visible_region_from_intrinsic
+from opencood.utils.airv2x_utils import get_bevcam_visible_region_from_intrinsic
 from more_itertools import unique_everseen
 
 
@@ -115,10 +115,10 @@ class BasePostprocessor(object):
 
         return gt_box3d_tensor
 
-    def generate_gt_bbx_skylink(self, data_dict):
+    def generate_gt_bbx_airv2x(self, data_dict):
         """
         The base postprocessor will generate 3d groundtruth bounding box.
-        This method is used for skylink dataset which is multiclass detection and tracking.
+        This method is used for airv2x dataset which is multiclass detection and tracking.
 
         For early and intermediate fusion,
             data_dict only contains ego.
@@ -585,7 +585,7 @@ class BasePostprocessor(object):
 
         return object_np, mask, object_ids
 
-    def generate_object_center_skylink(self, cav_contents, reference_lidar_pose):
+    def generate_object_center_airv2x(self, cav_contents, reference_lidar_pose):
         tmp_object_dict = {}
         for cav_content in cav_contents:
             tmp_object_dict.update(cav_content["params"]["objects"])
@@ -602,7 +602,7 @@ class BasePostprocessor(object):
         # else:
         filter_range = self.params["anchor_args"]["cav_lidar_range"]
 
-        box_utils.project_world_objects_skylink(
+        box_utils.project_world_objects_airv2x(
             tmp_object_dict,
             output_dict,
             reference_lidar_pose,
