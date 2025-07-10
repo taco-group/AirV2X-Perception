@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Author: Runsheng Xu <rxx3386@ucla.edu>, Hao Xiang <haxiang@g.ucla.edu>
+# Modifier: Xiangbo Gao <xiangbogaobarry@gmail.com>
 # License: TDG-Attribution-NonCommercial-NoDistrib
 
 
@@ -149,11 +150,6 @@ def main():
 
     model.zero_grad()
     model.eval()
-
-    # Create the dictionary for evaluation
-    # result_stat = {0.3: {'tp': [], 'fp': [], 'gt': 0},
-    #               0.5: {'tp': [], 'fp': [], 'gt': 0},
-    #               0.7: {'tp': [], 'fp': [], 'gt': 0}}
     result_stat_init = lambda: {
         0.3: {"tp": [], "fp": [], "gt": 0, "score": []},
         0.5: {"tp": [], "fp": [], "gt": 0, "score": []},
@@ -172,12 +168,7 @@ def main():
             raise ValueError("Timestamp not found in the path")
         result_stat = result_stat_dict[timestamp]
         with torch.no_grad():
-            # _batch_data = batch_data[0]
             batch_data = train_utils.to_device(batch_data, device)
-            # print(_batch_data.keys())
-            # _batch_data = train_utils.to_device(_batch_data, device)
-            # if 'scope' in hypes['name'] or 'how2comm' in hypes['name']:
-            #     batch_data= _batch_data
             if opt.fusion_method == "late":
                 pred_box_tensor, pred_score, gt_box_tensor, output_dict = (
                     inference_utils.inference_late_fusion(
@@ -271,7 +262,7 @@ def main():
                     vis_save_path,
                     method="3d",
                     left_hand=left_hand,
-                    vis_pred_box=False,
+                    vis_pred_box=True,
                     pcd_rsu = batch_data["ego"]["origin_lidar_rsu"][0],
                     pcd_drone = batch_data["ego"]["origin_lidar_drone"][0],
                     batch_data = batch_data,
@@ -291,14 +282,14 @@ def main():
                     vis_save_path,
                     method="bev",
                     left_hand=left_hand,
-                    vis_pred_box=False,
+                    vis_pred_box=True,
                     pcd_rsu = batch_data["ego"]["origin_lidar_rsu"][0],
                     pcd_drone = batch_data["ego"]["origin_lidar_drone"][0],
                     batch_data = batch_data,
                 )
-                
+    import pdb; pdb.set_trace()
     combined_stat = inference_utils.combine_stat_by_scenarios(result_stat_dict)
-
+    import pdb; pdb.set_trace()
     if len(total_comm_rates) > 0:
         comm_rates = sum(total_comm_rates) / len(total_comm_rates)
         if not isinstance(comm_rates, float):

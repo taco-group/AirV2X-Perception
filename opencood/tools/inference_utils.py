@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Author: Runsheng Xu <rxx3386@ucla.edu>
+# Modifier: Xiangbo Gao <xiangbogaobarry@gmail.com>
 # License: TDG-Attribution-NonCommercial-NoDistrib
 
 
@@ -343,6 +344,7 @@ def combine_stat(combined_stat, stat):
 
 
 def combine_stat_by_scenarios(result_stat_dict):
+    import pdb; pdb.set_trace()
     result_stat_init = lambda: {
         0.3: {"tp": [], "fp": [], "gt": 0, "score": []},
         0.5: {"tp": [], "fp": [], "gt": 0, "score": []},
@@ -352,7 +354,7 @@ def combine_stat_by_scenarios(result_stat_dict):
 
     for scenario, stat in result_stat_dict.items():
         if scenario not in scenarios_params:
-            print("Warning: scenario not in scenarios_params, skipping...")
+            print(f"Warning: scenario {scenario} not in scenarios_params, skipping...")
             continue
         for key, value in scenarios_params[scenario].items():
             if value:
@@ -373,8 +375,8 @@ def combine_stat_by_scenarios_segmentation(result_stat_dict):
     
     for scenario, stat in result_stat_dict.items():
         if scenario not in scenarios_params:
-            print("Warning: scenario not in scenarios_params, skipping...")
-            continue
+            print(f"Warning: scenario {scenario} not in scenarios_params, skipping...")
+            continue    
         for key, value in scenarios_params[scenario].items():
             if value:
                 combined_stat[key]["gt_dynamic_seg_map_list"].extend(stat["gt_dynamic_seg_map_list"]) 

@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# Author: Xiangbo Gao <xiangbogaobarry@gmail.com>
+# License: TDG-Attribution-NonCommercial-NoDistrib
+
 from collections import defaultdict, OrderedDict
 
 import torch

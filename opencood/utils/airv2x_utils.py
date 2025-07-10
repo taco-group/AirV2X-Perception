@@ -1,4 +1,7 @@
+# -*- coding: utf-8 -*-
 # Author: Yuheng Wu <yuhengwu@kaist.ac.kr>
+# Modifier: Xiangbo Gao <xiangbogaobarry@gmail.com>
+# License: TDG-Attribution-NonCommercial-NoDistrib
 
 """
 utilities for airv2x

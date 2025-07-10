@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# Author: Runsheng Xu <rxx3386@ucla.edu>
+# Modifier: Xiangbo Gao <xiangbogaobarry@gmail.com>
+# License: TDG-Attribution-NonCommercial-NoDistrib
+
 import numpy as np
 from matplotlib import pyplot as plt
 import torch
@@ -5,12 +10,6 @@ from matplotlib.colors import ListedColormap
 
 import opencood.visualization.simple_plot3d.canvas_3d as canvas_3d
 import opencood.visualization.simple_plot3d.canvas_bev as canvas_bev
-
-
-# def visualize_drone_image():
-#     import pdb; pdb.set_trace()
-#     img = batch_data['ego']['drone']['batch_merged_cam_inputs']   # torch.Size([2, 1, 4, 360, 640]), B, N, C(RGBD), H, W
-    
 
 def visualize(
     pred_box_tensor,
@@ -59,12 +58,6 @@ def visualize(
     if pcd_drone is not None:
         pcd_drone = pcd_drone.cpu().numpy()
         
-        
-    # batch_data = kwargs.get("batch_data", None)
-    # if batch_data is not None:
-    #     visualize_drone_image(batch_data, save_path)
-    
-    
     plt.figure(
         figsize=[(pc_range[3] - pc_range[0]) / 40, (pc_range[4] - pc_range[1]) / 40]
     )
@@ -167,7 +160,7 @@ def visualize(
             canvas.draw_boxes(pred_box_np, colors=(255, 0, 0))
             # canvas.draw_boxes(pred_box_np, colors=(255,0,0), texts=pred_name)
         if vis_gt_box:
-            canvas.draw_boxes(gt_box_np, colors=(0, 25, 0))
+            canvas.draw_boxes(gt_box_np, colors=(0, 255, 0))
             # canvas.draw_boxes(gt_box_np,colors=(0,255,0), texts=gt_name)
     else:
         raise (f"Not Completed for f{method} visualization.")

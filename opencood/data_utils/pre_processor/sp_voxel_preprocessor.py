@@ -16,14 +16,16 @@ from opencood.data_utils.pre_processor.base_preprocessor import BasePreprocessor
 from typing import Sequence, Mapping, Dict
 import warnings
 
+# Set up warning filter before defining the warning class
+warnings.filterwarnings(
+    "once",                      # Show warning only once
+    category=UserWarning,        # Match any UserWarning (including subclasses)
+    module="sp_voxel_preprocessor",  # Only for warnings from this module
+    message="Warning: empty point cloud. Add dummy points.*"  # Match the warning message pattern
+)
+
 class EmptyPointCloudWarning(UserWarning):
     pass
-
-warnings.filterwarnings(
-    "once",
-    category=EmptyPointCloudWarning,
-    message=r"^Warning: empty point cloud"
-)
 
 class SpVoxelPreprocessor(BasePreprocessor):
     def __init__(self, preprocess_params, train):
@@ -87,7 +89,7 @@ class SpVoxelPreprocessor(BasePreprocessor):
             pcd_np = np.concatenate((pcd_np1, pcd_np2), axis=0)
             # print("Warning: empty point cloud, add dummy points")
             with warnings.catch_warnings():
-                warnings.warn("Add dummy points. "
+                warnings.warn("Warning: empty point cloud. Add dummy points. Add dummy points. "
                               "This is because of some package loss during the data collection. "
                               "It will be solved in the future dataset version.", 
                               EmptyPointCloudWarning)

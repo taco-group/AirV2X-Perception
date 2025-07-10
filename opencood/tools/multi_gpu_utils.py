@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# Author: Runsheng Xu <rxx3386@ucla.edu>
+# Modifier: Xiangbo Gao <xiangbogaobarry@gmail.com>
+# License: TDG-Attribution-NonCommercial-NoDistrib
+
 import os
 
 import torch

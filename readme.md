@@ -13,3 +13,9 @@ Please download the dataset at [AirV2X-Perception](https://huggingface.co/datase
 The training and evaluation codes are released.
 
 The usage instructions will be provided soon!
+
+## Preparations
+
+Please download the checkpoints through
+
+## Model Training

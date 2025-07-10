@@ -1,4 +1,8 @@
-from re import A
+# -*- coding: utf-8 -*-
+# Author: Runsheng Xu <rxx3386@ucla.edu>
+# Modifier: Xiangbo Gao <xiangbogaobarry@gmail.com>
+# License: TDG-Attribution-NonCommercial-NoDistrib
+
 import cv2
 import numpy as np
 import torch
