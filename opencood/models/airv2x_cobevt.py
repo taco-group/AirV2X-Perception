@@ -47,6 +47,7 @@ class Airv2xCoBEVT(Airv2xBase):
             self.compression = True
             self.naive_compressor = NaiveCompressor(256, args["compression"])
 
+        args['fax_fusion']['agent_size'] = self.max_cav_num
         self.fusion_net = SwapFusionEncoder(args["fax_fusion"])
 
         self.outC = args["outC"]

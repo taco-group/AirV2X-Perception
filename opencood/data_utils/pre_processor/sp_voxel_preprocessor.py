@@ -40,12 +40,7 @@ class SpVoxelPreprocessor(BasePreprocessor):
 
             self.spconv = 2
         ego_type = self.params["ego_type"]
-        if ego_type == "vehicle":
-            self.lidar_range = self.params["cav_lidar_range"]
-        elif ego_type == "rsu":
-            self.lidar_range = self.params["rsu_lidar_range"]
-        elif ego_type == "drone":
-            self.lidar_range = self.params["drone_lidar_range"]
+        self.lidar_range = self.params["cav_lidar_range"]
         self.voxel_size = self.params["args"]["voxel_size"]
         self.max_points_per_voxel = self.params["args"]["max_points_per_voxel"]
 

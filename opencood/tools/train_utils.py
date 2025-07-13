@@ -57,7 +57,6 @@ def load_saved_model(saved_path, model, epoch=None):
             for file_ in file_list:
                 result = re.findall(".*epoch(.*).pth.*", file_)
                 epochs_exist.append(int(result[0]))
-            initial_epoch_ = max(epochs_exist)
         else:
             initial_epoch_ = 0
         return initial_epoch_
@@ -120,21 +119,25 @@ def load_saved_model(saved_path, model, epoch=None):
 
 def load_model(saved_path, model, epoch=None, start_from_best=True):
     """
-    Load saved model if exiseted
+    Load saved model if existed
 
     Parameters
     __________
     saved_path : str
-       model saved path
+        Model saved path
     model : opencood object
-        The model instance.
+        The model instance
+    epoch : int, optional
+        Specific epoch to load. If None, will load last epoch
+    start_from_best : bool
+        Whether to load the best performing model based on validation loss
 
     Returns
     -------
-    model : opencood object
-        The model instance loaded pretrained params.
+    Tuple[int, opencood object]
+        Tuple of (epoch_id, loaded_model)
     """
-    assert os.path.exists(saved_path), "{} not found".format(saved_path)
+    assert os.path.exists(saved_path), f"{saved_path} not found"
 
     def findLastCheckpoint(save_dir):
         file_list = glob.glob(os.path.join(save_dir, "*epoch*.pth"))
@@ -144,7 +147,7 @@ def load_model(saved_path, model, epoch=None, start_from_best=True):
                 result = re.findall(".*epoch(.*).pth.*", file_)
                 try:
                     _epoch = int(result[0])
-                except Exception as e:
+                except Exception:
                     pass
                 else:
                     epochs_exist.append(_epoch)
@@ -153,63 +156,100 @@ def load_model(saved_path, model, epoch=None, start_from_best=True):
             initial_epoch_ = 0
         return initial_epoch_
 
-    if epoch is not None:
-        initial_epoch = epoch
+    def find_best_epoch_from_validation_loss(validation_file):
+        """Find the epoch with lowest validation loss."""
+        with open(validation_file, "r") as f:
+            lines = f.readlines()
+        
+        best_loss = float('inf')
+        best_epoch = 0
+        
+        for line in lines:
+            # Parse epoch and loss from line like "Epoch[0], loss[3.62226081059957]"
+            match = re.match(r"Epoch\[(\d+)\], loss\[([\d.]+)\]", line.strip())
+            if match:
+                epoch = int(match.group(1))
+                loss = float(match.group(2))
+                
+                if loss < best_loss:
+                    best_loss = loss
+                    best_epoch = epoch
+        
+        return best_epoch
+
+    if start_from_best:
+        # First try to find explicit best validation model file
+        file_list = glob.glob(os.path.join(saved_path, "net_epoch_bestval_at*.pth"))
+        if file_list:
+            assert len(file_list) == 1
+            state_dict = torch.load(file_list[0], map_location="cpu")
+            # Map cdd weights to mdd if needed
+            if "cdd" in state_dict:
+                state_dict["mdd"] = state_dict.pop("cdd")
+            model.load_state_dict(state_dict, strict=False)
+            return eval(
+                file_list[0]
+                .split("/")[-1]
+                .rstrip(".pth")
+                .lstrip("net_epoch_bestval_at")
+            ), model
+        else:
+            # If no explicit best model file, use validation loss file
+            validation_file = os.path.join(saved_path, "validation_loss.txt")
+            if os.path.exists(validation_file):
+                best_epoch = find_best_epoch_from_validation_loss(validation_file)
+                print(f"Loading best model from epoch {best_epoch} based on validation loss")
+                initial_epoch = best_epoch
+            else:
+                print("No validation loss file found, using last checkpoint")
+                initial_epoch = findLastCheckpoint(saved_path)
     else:
-        if start_from_best:
-            file_list = glob.glob(os.path.join(saved_path, "net_epoch_bestval_at*.pth"))
-            if file_list:
-                assert len(file_list) == 1
-                state_dict = torch.load(file_list[0], map_location="cpu")
-                # 将 cdd 权重映射到 mdd
-                if "cdd" in state_dict:
-                    state_dict["mdd"] = state_dict.pop("cdd")
-                model.load_state_dict(state_dict, strict=False)
-                return eval(
-                    file_list[0]
-                    .split("/")[-1]
-                    .rstrip(".pth")
-                    .lstrip("net_epoch_bestval_at")
-                ), model
-        initial_epoch = findLastCheckpoint(saved_path)
+        initial_epoch = epoch if epoch is not None else findLastCheckpoint(saved_path)
 
     if initial_epoch > 0:
-        print("resuming by loading epoch %d" % initial_epoch)
-
-    state_dict_ = torch.load(
-        os.path.join(saved_path, "net_epoch%d.pth" % initial_epoch),
-        map_location="cuda:0",
-    )
-    state_dict = {}
-    # convert data_parallal to model
-    for k in state_dict_:
-        if k.startswith("module") and not k.startswith("module_list"):
-            state_dict[k[7:]] = state_dict_[k]
-        else:
-            if k.startswith("cdd"):
-                # rename cdd to mdd
-                state_dict["m" + k[1:]] = state_dict_[k]
+        print(f"Loading model from epoch {initial_epoch}")
+        model_path = os.path.join(saved_path, f"net_epoch{initial_epoch}.pth")
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Model file not found: {model_path}")
+            
+        state_dict_ = torch.load(model_path, map_location="cuda:0")
+        state_dict = {}
+        
+        # Convert data_parallel to model
+        for k in state_dict_:
+            if k.startswith("module") and not k.startswith("module_list"):
+                state_dict[k[7:]] = state_dict_[k]
             else:
-                state_dict[k] = state_dict_[k]
-    model_state_dict = model.state_dict()
-    for k in state_dict:
-        if k in model_state_dict:
-            if state_dict[k].shape != model_state_dict[k].shape:
-                print(
-                    "Skip loading parameter {}, required shape{}, "
-                    "loaded shape{}.".format(
-                        k, model_state_dict[k].shape, state_dict[k].shape
+                if k.startswith("cdd"):
+                    # rename cdd to mdd
+                    state_dict["m" + k[1:]] = state_dict_[k]
+                else:
+                    state_dict[k] = state_dict_[k]
+                    
+        model_state_dict = model.state_dict()
+        
+        # Handle state dict mismatches
+        for k in state_dict:
+            if k in model_state_dict:
+                if state_dict[k].shape != model_state_dict[k].shape:
+                    print(
+                        f"Skip loading parameter {k}, required shape {model_state_dict[k].shape}, "
+                        f"loaded shape {state_dict[k].shape}"
                     )
-                )
+                    state_dict[k] = model_state_dict[k]
+            else:
+                print(f"Drop parameter {k}")
+                
+        for k in model_state_dict:
+            if k not in state_dict:
+                print(f"No param {k}")
                 state_dict[k] = model_state_dict[k]
-        else:
-            print("Drop parameter {}.".format(k))
-    for k in model_state_dict:
-        if not (k in state_dict):
-            print("No param {}.".format(k))
-            state_dict[k] = model_state_dict[k]
-    model.load_state_dict(state_dict, strict=False)
-    return initial_epoch, model
+                
+        model.load_state_dict(state_dict, strict=False)
+        return initial_epoch, model
+    else:
+        print("No checkpoint found, starting from scratch")
+        return 0, model
 
 
 def setup_train(hypes):

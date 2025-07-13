@@ -162,11 +162,7 @@ def _torch_inverse_cast(input):
     dtype = input.dtype
     if dtype not in (torch.float32, torch.float64):
         dtype = torch.float32
-    if input.device != "cpu":
-        inv_input = torch.inverse(input.to("cpu")).to(input.device)
-    else:
-        inv_input = torch.inverse(input)
-    out = inv_input.to(input.dtype)
+    out = torch.inverse(input.to(dtype)).to(input.dtype)
     return out
 
 

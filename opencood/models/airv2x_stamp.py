@@ -28,8 +28,6 @@ class Airv2xSTAMP(Airv2xBase):
         # here we use image encoder LSS instead of lidar
         self.collaborators = args["collaborators"]
         self.active_sensors = args["active_sensors"]
-        max_cav = args["max_cav"]
-        self.max_cav_num = sum(max_cav.values())
         
         self.init_encoders(args)
         modality_args = args["modality_fusion"]

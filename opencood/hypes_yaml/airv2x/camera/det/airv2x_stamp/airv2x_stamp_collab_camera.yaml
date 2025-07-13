@@ -1,42 +1,61 @@
-name: airv2x_stamp_collab_lidar
-root_dir: 'dataset/airv2x/train'
-validate_dir: 'dataset/airv2x/val'
-num_class: &num_class 7
-num_anchor: &num_anchor 2
-device: cuda
+########
+# Name #
+########
 
-task: &task "det" # "det" or "seg"
-seg_hw: &seg_hw 512 # resolution of the segmentation map
+name: airv2x_stamp_collab_camera
 
-active_sensors: &active_sensors ["lidar"]
+############
+# Training #
+############
+
+active_sensors: &active_sensors ["cam"]
 collaborators: &collaborators ["vehicle", "rsu", "drone"]
+ego_type: &ego_type vehicle
 bevcam_fov: 110
 
 yaml_parser: "load_airv2x_params" # add support for airv2x
 train_params:
-  batch_size: &batch_size 1
-  epoches: 20
+  batch_size: &batch_size 2
+  epoches: 50
   eval_freq: 2
-  save_freq: 2
-  max_cav:
-    vehicle: 0
+  save_freq: 1
+  max_cav: &max_cav
+    vehicle: 5
     rsu: 5
     drone: 5
 
 device: &device cuda
 train: &train True
 
+
+###########
+# Dataset #
+###########
+
+root_dir: 'dataset/airv2x/train'
+validate_dir: 'dataset/airv2x/val'
+test_dir: 'dataset/airv2x/test'
+num_class: &num_class 7
+num_anchor: &num_anchor 2
+
+task: &task "det" # "det" or "seg"
+seg_branch: &seg_branch "both"
+seg_hw: &seg_hw 512 # resolution of the segmentation map
+seg_res: &seg_res 0.25
+dynamic_class: &dynamic_class 7
+static_class: &static_class 3
+
 fusion:
-  core_method: 'IntermediateFusionDatasetAirv2xHEAL' # LateFusionDataset, EarlyFusionDataset, IntermediateFusionDataset supported
+  core_method: 'IntermediateFusionDatasetAirv2x' # LateFusionDataset, EarlyFusionDataset, IntermediateFusionDataset supported
   args:
     proj_first: &proj_first true
-    grid_conf: &grid_conf
-      xbound: [-140.8, 140.8, 0.4]    # 限制x方向的范围并划分网格
-      ybound: [-40, 40, 0.4]   # 限制y方向的范围并划分网格
-      zbound: [-10, 10, 20.0]   # 限制z方向的范围并划分网格
+    veh_grid_conf: &veh_grid_conf
+      xbound: [-140.8, 140.8, 0.4]    
+      ybound: [-40, 40, 0.4]  
+      zbound: [-10, 10, 20.0] 
       ddiscr: [2, 50, 48]
       mode: 'LID'
-    data_aug_conf: &data_aug_conf_image
+    veh_data_aug_conf: &veh_data_aug_conf_image
       resize_lim: [0.65, 0.7]
       final_dim: [360, 640]
       rot_lim: [0, 0]
@@ -44,9 +63,38 @@ fusion:
       W: 1280 # 1280
       rand_flip: False
       bot_pct_lim: [0.0, 0.05]
-      # cams: ['camera0', 'camera1', 'camera2', 'camera3']
-      # Ncams: 4
+    
+    rsu_grid_conf: &rsu_grid_conf
+      xbound: [-140.8, 140.8, 0.4]  
+      ybound: [-40, 40, 0.4] 
+      zbound: [-30, 30, 60.0] 
+      ddiscr: [2, 50, 48]
+      mode: 'LID'
+    rsu_data_aug_conf: &rsu_data_aug_conf_image
+      resize_lim: [0.65, 0.7]
+      final_dim: [360, 640]
+      rot_lim: [0, 0]
+      H: 720 # 720
+      W: 1280 # 1280
+      rand_flip: False
+      bot_pct_lim: [0.0, 0.05]
 
+    drone_grid_conf: &drone_grid_conf
+      xbound: [-140.8, 140.8, 0.4]  
+      ybound: [-40, 40, 0.4] 
+      zbound: [-150, -6, 144] 
+      ddiscr: [6, 150, 144]
+      mode: 'UD'
+    drone_data_aug_conf: &drone_data_aug_conf_image
+      resize_lim: [0.65, 0.7]
+      final_dim: [360, 640]
+      rot_lim: [-3.6, 3.6]
+      H: 720 # 720
+      W: 1280 # 1280
+      rand_flip: False
+      bot_pct_lim: [0.0, 0.05]
+    
+# Note: data augmentation is not used for intermediate fusion, but we still keep the data augmentation config for consistency.
 data_augment:
   - NAME: random_world_flip
     ALONG_AXIS_LIST: [ 'x' ]
@@ -57,69 +105,25 @@ data_augment:
   - NAME: random_world_scaling
     WORLD_SCALE_RANGE: [ 0.95, 1.05 ]
 
-image_modality:
-  grid_conf: 
-    xbound: [-140.8, 140.8, 0.4]   # 限制x方向的范围并划分网格
-    ybound: [-40, 40, 0.4]   # 限制y方向的范围并划分网格
-    zbound: [-10, 10, 20.0]   # 限制z方向的范围并划分网格
-    ddiscr: [2, 50, 48]
-    mode: 'LID'
-  data_aug_conf:
-    resize_lim: [0.65, 0.7]
-    final_dim: [360, 640]
-    rot_lim: [0, 0] # [-3.6, 3.6]
-    H: 720
-    W: 1280
-    rand_flip: False
-    bot_pct_lim: [0.0, 0.05]
-
-  shrink_header:
-    input_dim: 160
-    kernel_size: 1
-    dim: 1
-    stride: 1
-    padding: 1 
-    
-  bevout_feature: 64 # tbd
-  img_downsample: 8
-  img_features: 64
-  anchor_number: *num_anchor
-  camera_encoder: EfficientNet
-  use_depth_gt: True
-  depth_supervision: False
-
-
-
-lidar_modality:
-  data_aug_conf:
-    - NAME: random_world_flip
-      ALONG_AXIS_LIST: [ 'x' ]
-
-    - NAME: random_world_rotation
-      WORLD_ROT_ANGLE: [ -0.78539816, 0.78539816 ]
-
-    - NAME: random_world_scaling
-      WORLD_SCALE_RANGE: [ 0.95, 1.05 ]
-
 # preprocess-related
 preprocess:
   # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
   core_method: 'SpVoxelPreprocessor'
+  ego_type: *ego_type
   args:
-    voxel_size: &voxel_size [0.4, 0.4, 400]
+    voxel_size: &voxel_size [0.4, 0.4, 4] # Use ego type
     max_points_per_voxel: 32
     max_voxel_train: 32000
     max_voxel_test: 70000
-  # lidar range for each individual cav.
-  cav_lidar_range: &cav_lidar [-140.8, -40, -200, 140.8, 40, 200]    
-  rsu_lidar_range: &rsu_lidar [-140.8, -40, -200, 140.8, 40, 200]    
-  drone_lidar_range: &drone_lidar [-140.8, -40, -200, 140.8, 40, 200]    
+  # lidar range for each agent
+  cav_lidar_range: &cav_lidar [-140.8, -40, -3, 140.8, 40, 1] # Use ego type    
 
 # anchor box related
 postprocess:
   core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+  ego_type: *ego_type
   anchor_args:
-    cav_lidar_range: *cav_lidar
+    cav_lidar_range: *cav_lidar # Note: Use ego type
     l: 3.9
     w: 1.6
     h: 1.56
@@ -127,15 +131,13 @@ postprocess:
     feature_stride: 2
     num: *num_anchor
   target_args:
-    pos_threshold: 0.6
+    pos_threshold: 0.60
     neg_threshold: 0.45
     score_threshold: 0.20
     obj_threshold: 0.20
   order: 'hwl' # hwl or lwh
   max_num: 300 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
-  nms_thresh: 0.15 
-
-
+  nms_thresh: 0.15
 
 # model related
 model:
@@ -149,14 +151,17 @@ model:
     supervise_single: False
     backbone_fix: True
 
-    # cam encoder for all
+    ###################
+    # Vehicular Agent #
+    ###################
     vehicle:
-      modalities: ["lidar"]  # "cam", "lidar"
+      modalities: ["cam"]  # "cam", "lidar"
 
       lidar:
-        voxel_size: *voxel_size
-        lidar_range: *cav_lidar
+        voxel_size: &veh_voxel_size [0.4, 0.4, 4]
+        lidar_range: &veh_lidar [-140.8, -40, -3, 140.8, 40, 1]
         compression: 0 # compression rate
+        backbone_fix: false
         pillar_vfe:
           use_norm: true
           with_distance: false
@@ -166,8 +171,8 @@ model:
           num_features: 64
 
       cam:
-        grid_conf: *grid_conf
-        data_aug_conf: *data_aug_conf_image
+        grid_conf: *veh_grid_conf
+        data_aug_conf: *veh_data_aug_conf_image
         img_downsample: 8
         img_features: 64
         bevout_feature: 64
@@ -194,16 +199,19 @@ model:
           out_cav_lidar_range: *cav_lidar
           in_feature_shape: [128, 128]
           out_feature_shape: [128, 128]
-
-
+    
+    ###################
+    # Road Side Units #
+    ###################
 
     rsu:
-      modalities: ["lidar"]  # "cam", "lidar"
+      modalities: ["cam"]  # "cam", "lidar"
 
       lidar:
-        voxel_size: *voxel_size
-        lidar_range: *cav_lidar
+        voxel_size: &rsu_voxel_size [0.4, 0.4, 60]
+        lidar_range: &rsu_lidar [-140.8, -40, -30, 140.8, 40, 30]
         compression: 0 # compression rate
+        backbone_fix: false
         pillar_vfe:
           use_norm: true
           with_distance: false
@@ -213,8 +221,8 @@ model:
           num_features: 64
 
       cam:
-        grid_conf: *grid_conf
-        data_aug_conf: *data_aug_conf_image
+        grid_conf: *rsu_grid_conf
+        data_aug_conf: *rsu_data_aug_conf_image
         img_downsample: 8
         img_features: 64
         bevout_feature: 64
@@ -249,13 +257,18 @@ model:
             num_of_blocks: 3
             dim: 64
 
+    ######################
+    # UAV (Drone) Agents #
+    ######################
+
     drone:
-      modalities: ["lidar"]  # "cam", "lidar"
+      modalities: ["cam"]  # "cam", "lidar"
 
       lidar:
-        voxel_size: *voxel_size
-        lidar_range: *cav_lidar
+        voxel_size: &drone_voxel_size [0.4, 0.4, 144]
+        lidar_range: &drone_lidar [-140.8, -40, -150, 140.8, 40, -6]
         compression: 0 # compression rate
+        backbone_fix: false
         pillar_vfe:
           use_norm: true
           with_distance: false
@@ -264,16 +277,15 @@ model:
         point_pillar_scatter:
           num_features: 64
 
-      encoder_args:
-        voxel_size: *voxel_size
-        lidar_range: *cav_lidar
-        pillar_vfe:
-          use_norm: true
-          with_distance: false
-          use_absolute_xyz: true
-          num_filters: [64]
-        point_pillar_scatter:
-          num_features: 64
+      cam:
+        grid_conf: *drone_grid_conf
+        data_aug_conf: *drone_data_aug_conf_image
+        img_downsample: 8
+        img_features: 64
+        bevout_feature: 64
+        camera_encoder: EfficientNet
+        use_depth_gt: true
+        depth_supervision: false
 
       adapter:
         core_method: adapterconvnext
@@ -281,7 +293,7 @@ model:
           in_channels: 64
           out_channels: 64
           in_cav_lidar_range: *cav_lidar
-          out_cav_lidar_range: *drone_lidar
+          out_cav_lidar_range: *rsu_lidar
           in_feature_shape: [128, 128]
           out_feature_shape: [128, 128]
           submodule_args:
@@ -293,7 +305,7 @@ model:
         args:
           in_channels: 64
           out_channels: 64
-          in_cav_lidar_range: *drone_lidar
+          in_cav_lidar_range: *rsu_lidar
           out_cav_lidar_range: *cav_lidar
           in_feature_shape: [128, 128]
           out_feature_shape: [128, 128]
@@ -346,6 +358,9 @@ model:
     seg_res: *seg_res
     obj_head: true
 
+##################
+# Loss Functions #
+##################
 
 loss:
   det:
@@ -370,6 +385,10 @@ loss:
       d_coe: 2.0
       s_coe: 0.0
       
+###########
+# Learner #
+###########
+
 optimizer:
   core_method: Adam
   lr: 0.002

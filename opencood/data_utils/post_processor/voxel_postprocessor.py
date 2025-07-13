@@ -28,12 +28,7 @@ class VoxelPostprocessor(BasePostprocessor):
         self.anchor_num = self.params["anchor_args"].get("num", 2)
         self.num_class = self.params["anchor_args"].get("num_class", 7)
         ego_type = self.params["ego_type"]
-        if ego_type == "vehicle":
-            self.lidar_range = self.params["anchor_args"]["cav_lidar_range"]
-        elif ego_type == "rsu":
-            self.lidar_range = self.params["anchor_args"]["rsu_lidar_range"]
-        elif ego_type == "drone":
-            self.lidar_range = self.params["anchor_args"]["drone_lidar_range"]
+        self.lidar_range = self.params["anchor_args"]["cav_lidar_range"]
 
     def generate_anchor_box(self):
         W = self.params["anchor_args"]["W"]

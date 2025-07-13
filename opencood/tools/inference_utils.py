@@ -344,7 +344,6 @@ def combine_stat(combined_stat, stat):
 
 
 def combine_stat_by_scenarios(result_stat_dict):
-    import pdb; pdb.set_trace()
     result_stat_init = lambda: {
         0.3: {"tp": [], "fp": [], "gt": 0, "score": []},
         0.5: {"tp": [], "fp": [], "gt": 0, "score": []},

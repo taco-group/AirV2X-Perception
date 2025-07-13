@@ -2,15 +2,15 @@
 # Name #
 ########
 
-name: airv2x_intermediate_when2com
+name: airv2x_stamp_drone_lidar
 
 ############
 # Training #
 ############
 
 active_sensors: &active_sensors ["lidar"]
-collaborators: &collaborators ["vehicle", "rsu", "drone"]
-ego_type: &ego_type vehicle
+collaborators: &collaborators ["drone"]
+ego_type: &ego_type drone
 bevcam_fov: 110
 
 yaml_parser: "load_airv2x_params" # add support for airv2x
@@ -20,8 +20,8 @@ train_params:
   eval_freq: 2
   save_freq: 1
   max_cav: &max_cav
-    vehicle: 5
-    rsu: 5
+    vehicle: 0
+    rsu: 0
     drone: 5
 
 device: &device cuda
@@ -111,12 +111,12 @@ preprocess:
   core_method: 'SpVoxelPreprocessor'
   ego_type: *ego_type
   args:
-    voxel_size: &voxel_size [0.4, 0.4, 4] # Use ego type
+    voxel_size: &voxel_size [0.4, 0.4, 144] # Use ego type
     max_points_per_voxel: 32
     max_voxel_train: 32000
     max_voxel_test: 70000
   # lidar range for each agent
-  cav_lidar_range: &cav_lidar [-140.8, -40, -3, 140.8, 40, 1] # Use ego type    
+  cav_lidar_range: &cav_lidar [-140.8, -40, -150, 140.8, 40, -6] # Use ego type    
 
 # anchor box related
 postprocess:
@@ -141,12 +141,10 @@ postprocess:
 
 # model related
 model:
-  core_method: airv2x_when2com
+  core_method: airv2x_stamp
   args:
-    ego_type: *ego_type
     collaborators: *collaborators
     active_sensors: *active_sensors
-    max_cav: *max_cav
     device: *device
     train: *train
     proj_first: *proj_first
@@ -241,44 +239,42 @@ model:
         camera_encoder: EfficientNet
         use_depth_gt: true
         depth_supervision: false
-
-    # params for modality fusion
     modality_fusion:
       base_bev_backbone:
-        layer_nums: [3, 5, 8]
-        layer_strides: [2, 2, 2]
-        num_filters: [64, 128, 256]
-        upsample_strides: [1, 2, 4]
-        num_upsample_filter: [128, 128, 128]
-      
-      shrink_header:
-        use: true 
-        input_dim: 384  # 128 * 3
-        dim: [ &out_channels 256 ] 
-        kernal_size: [ 1 ] # TODO(YH): we don't shrink the HW in the current version
-        stride: [ 1 ]
-        padding: [ 0 ]
-      
+        layer_nums: [3]
+        layer_strides: [2]
+        num_filters: [64]
+  
+      # layers_args: 
+      #   layer_nums: [3, 5, 8]
+      #   layer_strides: [2, 2, 2]
+      #   num_filters: [64, 128, 256]
+      #   upsample_strides: [1, 2, 4]
+      #   num_upsample_filter: [128, 128, 128]
+
       compression: 0  # Compression rate
 
-      # params for collaborative fusion: where2comm
-    when2com_fusion:
-      voxel_size: *voxel_size # TODO(YH): we still need the voxel size for now but we actually use cam
-      downsample_rate: 4
-      num_iteration: 2
-      in_channels: 256
-      query_size: 32
-      key_size: 256
-      mode: softmax
-      H: 100
-      W: 352
+      shrink_header: 
+        use: true 
+        kernal_size: [ 3 ]
+        stride: [ 1 ]
+        padding: [ 1 ]
+        dim: [ 256 ]
+        input_dim: 384 # 128 * 3
 
-    # params for prediction
+    fusion_backbone: 
+      resnext: true
+      layer_nums: [3, 5, 8]
+      layer_strides: [1, 2, 2]
+      num_filters: [64, 128, 256]
+      upsample_strides: [1, 2, 4]
+      num_upsample_filter: [128, 128, 128]
+      anchor_number: *num_anchor
+
     task: *task
     seg_branch: *seg_branch
     seg_hw: *seg_hw
-    head_dim: 256
-    outC: *out_channels
+    in_head: 256
     anchor_number: *num_anchor
     num_class: *num_class
     dynamic_class: *dynamic_class
@@ -286,8 +282,6 @@ model:
     cav_range: *cav_lidar
     seg_res: *seg_res
     obj_head: true
-
-
 
 ##################
 # Loss Functions #
@@ -315,8 +309,7 @@ loss:
       l_weights: 8.0
       d_coe: 2.0
       s_coe: 0.0
-
-
+      
 ###########
 # Learner #
 ###########
@@ -331,5 +324,5 @@ optimizer:
 lr_scheduler:
   core_method: multistep #step, multistep and Exponential support
   gamma: 0.1
-  step_size: [10, 25, 40]
+  step_size: [10, 25]
 

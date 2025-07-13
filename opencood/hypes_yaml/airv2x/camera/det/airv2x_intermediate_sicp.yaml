@@ -25,9 +25,9 @@ train_params:
   save_freq: 1
   max_cav_num: &max_cav_num 15
   max_cav:
-    vehicle: 5
-    rsu: 5
-    drone: 5
+    vehicle: 3
+    rsu: 2
+    drone: 2
 
 fusion_model:
   sicp: true

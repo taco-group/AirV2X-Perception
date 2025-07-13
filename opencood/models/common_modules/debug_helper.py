@@ -3,6 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+import cv2
+from PIL import Image
+import torch.nn.functional as F
 
 def visualize_bev_points(points, batch_idx=0, camera_idx=None, max_points=10000):
     """
@@ -251,3 +255,203 @@ def visualize_density(points, batch_idx=0, camera_idx=None, grid_res=0.5):
     
     plt.tight_layout()
     plt.savefig('/home/xiangbog/Folder/Research/SkyLink/airv2x/debug/density_visualization.png', dpi=300)
+
+def visualize_bev_feature(
+        bev_feat: torch.Tensor,
+        batch_idx: int = 0,
+        channel_idx: int = None,
+        save_path: str = None
+    ) -> np.ndarray:
+    """
+    Visualize a BEV feature map as a heatmap.
+
+    Args:
+        bev_feat (torch.Tensor): Input tensor of shape [B, C, H, W].
+        batch_idx (int): Index of the sample in the batch to visualize. Default is 0.
+        channel_idx (int): If specified, visualize only this channel; otherwise, average across all channels.
+        save_path (str): If given, save the heatmap image to this path; otherwise, display it in a window.
+
+    Returns:
+        np.ndarray: The resulting BGR heatmap image (dtype uint8).
+    """
+    # Extract the chosen sample and move to CPU numpy array
+    if isinstance(bev_feat, torch.Tensor):
+        array = bev_feat[batch_idx].detach().cpu().numpy()  # shape: (C, H, W)
+    else:
+        array = bev_feat  # assume already a numpy array
+
+    # Select a single channel or average across channels
+    if channel_idx is None:
+        feature = np.mean(array, axis=0)  # shape: (H, W)
+    else:
+        feature = array[channel_idx]      # shape: (H, W)
+
+    # Normalize values to [0, 255]
+    gray_img = (feature * 255).astype(np.uint8)
+
+    # Save or display the result
+    if save_path:
+        cv2.imwrite(save_path, gray_img)
+    else:
+        cv2.imshow("BEV Feature Heatmap", gray_img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+def visualize_bev_feature_in_once(save_path):
+    """
+    Visualize multiple BEV features by overlaying them with different colors.
+
+    Args:
+        save_path (str): Base path for saving the visualization results.
+    """
+    imgs = [Image.open(save_path + f"bev_feature_{i}.png").convert('L') for i in range(6)]
+    w, h = imgs[0].size  
+
+    # Define 6 RGB colors for different features
+    colors = [
+        (255,   0,   0),  # Red
+        (  0, 255,   0),  # Green
+        (  0,   0, 255),  # Blue
+        (255, 255,   0),  # Yellow
+        (255,   0, 255),  # Magenta
+        (  0, 255, 255),  # Cyan
+    ]
+
+    # Accumulate colored features
+    canvas = np.zeros((h, w, 3), dtype=np.float32)
+    for gray, col in zip(imgs, colors):
+        arr = np.array(gray, dtype=np.float32) / 255.0  # Normalize
+        for c in range(3):
+            canvas[..., c] += arr * col[c]
+
+    # Clip values and convert to uint8
+    canvas = np.clip(canvas, 0, 255).astype(np.uint8)
+    out = Image.fromarray(canvas)
+    out.save(save_path + "bev_overlay.png")
+
+def depth_to_one_hot(x, num_bins=41, min_val=0.0, max_val=256.0):
+    """
+    Convert depth values to one-hot encoding.
+
+    Args:
+        x: Tensor of shape [B, N, 1, fH, fW, C], depth values in [min_val, max_val]
+        num_bins: number of one-hot bins (default: 41)
+        min_val: minimum depth value
+        max_val: maximum depth value
+
+    Returns:
+        Tensor of shape [B, N, num_bins, fH, fW, C], one-hot along the depth dimension
+    """
+    # Remove the singleton depth dim
+    depth = x.squeeze(2)           # -> [B, N, fH, fW, C]
+    
+    # Compute number of bins based on max depth value
+    num_bins = int(depth.max()) + 1
+
+    # One-hot encode
+    one_hot = F.one_hot(depth, num_classes=num_bins)  # -> [B,N,fH,fW,C,num_bins]
+    
+    # Move the bin axis into position 2
+    one_hot = one_hot.permute(0, 1, 5, 2, 3, 4).float()  # -> [B,N,num_bins,fH,fW,C]
+    return one_hot
+
+def visualize_3d_points(geom, x_img, save_path='3d_points.png', threshold=0):
+    """
+    Visualize depth-encoded image features mapped to 3D space.
+    
+    Args:
+        geom: B x N x D x H x W x 3 tensor, mapping from pixel coordinates to ego vehicle coordinate system
+        x_img: B x N x D x fH x fW x 1 tensor, one-hot encoded depth
+        save_path: path to save visualization results
+        threshold: threshold for considering a depth bin as valid
+    """
+    # Convert inputs to numpy arrays
+    if isinstance(geom, torch.Tensor):
+        geom = geom.detach().cpu().numpy()
+    if isinstance(x_img, torch.Tensor):
+        x_img = x_img.detach().cpu().numpy()
+    
+    # Process only the first batch
+    batch_idx = 0
+    
+    # Create figure with 3D axes (GUI-less mode)
+    fig = plt.figure(figsize=(10, 8))
+    canvas = FigureCanvas(fig)
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # Get dimension information
+    B, N, D, H, W, _ = geom.shape
+    B, N, D, fH, fW, _ = x_img.shape
+    
+    # Calculate scaling factors (if feature map size differs from original image)
+    scale_h = H / fH
+    scale_w = W / fW
+    
+    # Assign different colors for each camera
+    colors = plt.cm.rainbow(np.linspace(0, 1, N))
+    
+    for cam_idx in range(N):
+        # Extract geometry mapping and depth encoding for current camera
+        cam_geom = geom[batch_idx, cam_idx]  # D x H x W x 3
+        cam_depth = x_img[batch_idx, cam_idx]  # D x fH x fW x 1
+        
+        # Remove last dimension from cam_depth
+        cam_depth = cam_depth.squeeze(-1)  # D x fH x fW
+        
+        # Find depth bin with maximum value for each pixel
+        depth_values = np.max(cam_depth, axis=0)  # fH x fW
+        depth_indices = np.argmax(cam_depth, axis=0)  # fH x fW
+        
+        # Collect 3D points
+        points_3d = []
+        
+        # Process each pixel
+        for h in range(fH):
+            for w in range(fW):
+                if depth_values[h, w] > threshold:
+                    d = depth_indices[h, w]
+                    
+                    # Map to original image coordinates
+                    orig_h = min(int(h * scale_h), H - 1)
+                    orig_w = min(int(w * scale_w), W - 1)
+                    
+                    # Get 3D coordinates
+                    point_3d = cam_geom[d, orig_h, orig_w]
+                    points_3d.append(point_3d)
+        
+        print(f"Camera {cam_idx+1}: Found {len(points_3d)} valid 3D points")
+        
+        if points_3d:
+            points_3d = np.array(points_3d)
+            
+            # Plot points in 3D
+            ax.scatter(
+                points_3d[:, 0], points_3d[:, 1], points_3d[:, 2],
+                c=[colors[cam_idx]], s=1, alpha=0.5, label=f'Camera {cam_idx+1}'
+            )
+    
+    # Set plot properties
+    ax.set_title('3D point cloud visualization')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    
+    # Set equal aspect ratio
+    x_lim = ax.get_xlim3d()
+    y_lim = ax.get_ylim3d()
+    z_lim = ax.get_zlim3d()
+    x_range = x_lim[1] - x_lim[0]
+    y_range = y_lim[1] - y_lim[0]
+    max_range = max(x_range, y_range)
+
+    z_mid = 0.5 * (z_lim[0] + z_lim[1])
+    ax.set_zlim3d(z_mid - max_range/2, z_mid + max_range/2)
+    ax.set_box_aspect([1, 1, 1]) 
+    ax.set_proj_type('ortho')
+    ax.legend()
+    
+    # Save figure
+    fig.savefig(save_path)
+    plt.close(fig)
+    
+    print(f"3D visualization saved to {save_path}")

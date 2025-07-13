@@ -21,9 +21,9 @@ train_params:
   eval_freq: 2
   save_freq: 1
   max_cav: &max_cav
-    vehicle: 5
-    rsu: 5
-    drone: 5
+    vehicle: 3
+    rsu: 2
+    drone: 2
 
 device: &device cuda
 train: &train True
@@ -35,6 +35,7 @@ train: &train True
 
 root_dir: 'dataset/airv2x/train'
 validate_dir: 'dataset/airv2x/val'
+test_dir: 'dataset/airv2x/test'
 num_class: &num_class 7
 num_anchor: &num_anchor 2
 
@@ -134,7 +135,7 @@ postprocess:
     pos_threshold: 0.60
     neg_threshold: 0.45
     score_threshold: 0.20
-    obj_thresh: 0.20
+    obj_threshold: 0.20
   order: 'hwl' # hwl or lwh
   max_num: 300 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
   nms_thresh: 0.15

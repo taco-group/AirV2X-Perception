@@ -27,16 +27,6 @@ class Airv2xV2XVit(Airv2xBase):
         self.active_sensors = args["active_sensors"]
         max_cav = args["max_cav"]
         self.max_cav_num = sum(max_cav.values())
-
-        # if "vehicle" in self.collaborators:
-        #     self.veh_model = LiftSplatShootEncoder(args, agent_type="vehicle")
-
-        # if "rsu" in self.collaborators:
-        #     self.rsu_model = LiftSplatShootEncoder(args, agent_type="rsu")
-
-        # if "drone" in self.collaborators:
-        #     self.drone_model = LiftSplatShootEncoder(args, agent_type="drone")
-        
         self.init_encoders(args)
 
         modality_args = args["modality_fusion"]
@@ -132,11 +122,6 @@ class Airv2xV2XVit(Airv2xBase):
         if self.compression:
             spatial_features_2d = self.naive_compressor(spatial_features_2d)
 
-        feat = spatial_features_2d[0].mean(0).detach().cpu().numpy()
-        import cv2; import numpy as np
-        cv2.imwrite("debug/debug_image_bevfeat_drone_lidar.png", ((feat - feat.min()) / (feat.max() - feat.min()) * 255).astype(np.uint8),)
-        
-
         regroup_feature, mask = regroup(
             spatial_features_2d, batch_record_len, self.max_cav_num
         )
@@ -148,31 +133,11 @@ class Airv2xV2XVit(Airv2xBase):
 
         regroup_feature = regroup_feature.permute(0, 1, 3, 4, 2).contiguous()
         
-        
-        # feat = spatial_features_2d[0].mean(0).detach().cpu().numpy()
-        # import cv2; import numpy as np
-        # cv2.imwrite("/home/xiangbog/Folder/Research/airv2x/debug/debug_image_bevfeat.png", ((feat - feat.min()) / (feat.max() - feat.min()) * 255).astype(np.uint8),)
-        
-        # dynamic = data_dict['label_dict']['dynamic_seg_label'][0]
-        # dynamic = dynamic.detach().cpu().numpy()
-        # cv2.imwrite("/home/xiangbog/Folder/Research/airv2x/debug/debug_image_dynamic.png", ((dynamic - dynamic.min()) / (dynamic.max() - dynamic.min()) * 255).astype(np.uint8),)
-        # import pdb; pdb.set_trace()
-
-        # transformer fusion
-        # TODO(YH): fix window size here
-        # current regroup_feature is [N, C, 100, 352, D] which is not divided by [4, 8, 16] window size
-        #  (1) change window size or (2) change voxel config or (3) change cav_lidar_range to produce regular shape
         fused_feature = self.fusion_net(
             regroup_feature, mask, spatial_correction_matrix
         )
         # b h w c -> b c h w
         fused_feature = fused_feature.permute(0, 3, 1, 2).contiguous()
-
-
-        # feat_fused = fused_feature[0].mean(0).detach().cpu().numpy()
-        # cv2.imwrite("/home/xiangbog/Folder/Research/SkyLink/airv2x/debug/debug_image_fusedfeat.png", ((feat_fused - feat_fused.min()) / (feat_fused.max() - feat_fused.min()) * 255).astype(np.uint8),)
-
-        
 
         ret_dict = {}
         if self.args["task"] == "det":
@@ -191,7 +156,6 @@ class Airv2xV2XVit(Airv2xBase):
             )
 
         elif self.args["task"] == "seg":
-            # seg_logits = self.seg_head(fused_feature)
             seg_output_dict = self.seg_head(fused_feature)
             ret_dict.update(
                 {

@@ -2,35 +2,29 @@
 # If you want build the agent-object pose graph to correct pose error, 
 # please refer to https://github.com/yifanlu0227/CoAlign
 
-name: airv2x_intermediate_v2xvit_lidar_drone_only
+name: airv2x_intermediate_bm2cp_camera
 root_dir: 'dataset/airv2x/train'
 validate_dir: 'dataset/airv2x/val'
 num_class: &num_class 7
 num_anchor: &num_anchor 2
 device: cuda
-
 task: &task "det" # "det" or "seg"
-seg_branch: &seg_branch "both"
 seg_hw: &seg_hw 512 # resolution of the segmentation map
 seg_res: &seg_res 0.25
-dynamic_class: &dynamic_class 7
-static_class: &static_class 3
 
-active_sensors: &active_sensors ["lidar"]
-collaborators: &collaborators ["drone"]
-ego_type: drone
+active_sensors: &active_sensors ["cam"]
+collaborators: &collaborators ["vehicle", "rsu", "drone"]
 bevcam_fov: 110
 
-yaml_parser: "load_airv2x_params" # add support for airv2x
+yaml_parser: "load_airv2x_bm2cp_params" # add support for airv2x
 train_params:
-  batch_size: &batch_size 4
-  epoches: 30
-  eval_freq: 1
+  batch_size: &batch_size 2
+  epoches: 20
+  eval_freq: 5
   save_freq: 1
-  max_cav_num: &max_cav_num 2 # change according, it may better compute in code
   max_cav:
-    vehicle: 0
-    rsu: 0
+    vehicle: 3
+    rsu: 2
     drone: 2
 
 
@@ -38,19 +32,19 @@ device: &device cuda
 train: &train True
 
 fusion:
-  core_method: 'IntermediateFusionDatasetAirv2xHEAL' # LateFusionDataset, EarlyFusionDataset, IntermediateFusionDataset supported
+  core_method: 'IntermediateFusionDatasetAirv2xBM2CP' # LateFusionDataset, EarlyFusionDataset, IntermediateFusionDataset supported
   args:
     proj_first: &proj_first true
     grid_conf: &grid_conf
-      xbound: [-70.4, 70.4, 0.4]    # 限制x方向的范围并划分网格
+      xbound: [-140.8, 140.8, 0.4]    # 限制x方向的范围并划分网格
       ybound: [-40, 40, 0.4]   # 限制y方向的范围并划分网格
-      zbound: [-150, -6, 144]   # 限制z方向的范围并划分网格
-      ddiscr: [6, 150, 144]
-      mode: 'UD'
+      zbound: [-10, 10, 20.0]   # 限制z方向的范围并划分网格
+      ddiscr: [2, 50, 48]
+      mode: 'LID'
     data_aug_conf: &data_aug_conf_image
       resize_lim: [0.65, 0.7]
       final_dim: [360, 640]
-      rot_lim: [-3.6, 3.6]
+      rot_lim: [0, 0]
       H: 720 # 720
       W: 1280 # 1280
       rand_flip: False
@@ -70,21 +64,19 @@ data_augment:
 
 image_modality:
   grid_conf: 
-    xbound: [-70.4, 70.4, 0.4]    # 限制x方向的范围并划分网格
+    xbound: [-140.8, 140.8, 0.4]   # 限制x方向的范围并划分网格
     ybound: [-40, 40, 0.4]   # 限制y方向的范围并划分网格
-    zbound: [-150, -6, 144]   # 限制z方向的范围并划分网格
-    ddiscr: [6, 150, 144]
-    mode: 'UD'
+    zbound: [-10, 10, 20.0]   # 限制z方向的范围并划分网格
+    ddiscr: [2, 50, 48]
+    mode: 'LID'
   data_aug_conf:
     resize_lim: [0.65, 0.7]
     final_dim: [360, 640]
-    rot_lim: [-3.6, 3.6]
+    rot_lim: [0, 0] # [-3.6, 3.6]
     H: 720
     W: 1280
     rand_flip: False
     bot_pct_lim: [0.0, 0.05]
-
-
   shrink_header:
     input_dim: 160
     kernel_size: 1
@@ -116,12 +108,12 @@ preprocess:
   # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
   core_method: 'SpVoxelPreprocessor'
   args:
-    voxel_size: &voxel_size [0.4, 0.4, 144]
+    voxel_size: &voxel_size [0.4, 0.4, 400]
     max_points_per_voxel: 32
     max_voxel_train: 32000
     max_voxel_test: 70000
   # lidar range for each individual cav.
-  cav_lidar_range: &cav_lidar [-70.4, -40, -150, 70.4, 40, -6]    
+  cav_lidar_range: &cav_lidar [-140.8, -40, -200, 140.8, 40, 200]    
   rsu_lidar_range: &rsu_lidar [-140.8, -40, -3, 140.8, 40, 1]    
 
 # anchor box related
@@ -139,157 +131,111 @@ postprocess:
     pos_threshold: 0.6
     neg_threshold: 0.45
     score_threshold: 0.20
-    obj_threshold: 0.003
   order: 'hwl' # hwl or lwh
   max_num: 300 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
   nms_thresh: 0.15
 
 # model related
 model:
-  core_method: airv2x_v2xvit
+  core_method: airv2x_bm2cp 
   args:
     collaborators: *collaborators
     active_sensors: *active_sensors
-    max_cav_num: *max_cav_num
     device: *device
     train: *train
     proj_first: *proj_first
     supervise_single: False
     backbone_fix: False
 
-    # cam encoder for all
     vehicle:
-      modalities: ["lidar"]  # "cam", "lidar"
-
-      lidar:
-        voxel_size: *voxel_size
-        lidar_range: *cav_lidar
-        compression: 0 # compression rate
-        backbone_fix: false
-        pillar_vfe:
-          use_norm: true
-          with_distance: false
-          use_absolute_xyz: true
-          num_filters: [64]
-        point_pillar_scatter:
-          num_features: 64
-
-      cam:
+      img_params:
         grid_conf: *grid_conf
         data_aug_conf: *data_aug_conf_image
         img_downsample: 8
-        img_features: 64
-        bevout_feature: 64
-        camera_encoder: EfficientNet
+        bev_dim: 64
         use_depth_gt: true
-        depth_supervision: false
-    
+        depth_supervision: false #true
+      pc_params:
+        voxel_size: *voxel_size
+        lidar_range: *cav_lidar
+        pillar_vfe:
+          use_norm: True
+          with_distance: False
+          use_absolute_xyz: True
+          num_filters: [ 64 ]
+        point_pillar_scatter:
+          num_features: 64
     rsu:
-      modalities: ["lidar"]  # "cam", "lidar"
-
-      lidar:
-        voxel_size: *voxel_size
-        lidar_range: *cav_lidar
-        compression: 0 # compression rate
-        backbone_fix: false
-        pillar_vfe:
-          use_norm: true
-          with_distance: false
-          use_absolute_xyz: true
-          num_filters: [64]
-        point_pillar_scatter:
-          num_features: 64
-
-      cam:
+      img_params:
         grid_conf: *grid_conf
         data_aug_conf: *data_aug_conf_image
         img_downsample: 8
-        img_features: 64
-        bevout_feature: 64
-        camera_encoder: EfficientNet
+        bev_dim: 64
         use_depth_gt: true
-        depth_supervision: false
-
+        depth_supervision: false #true
+      pc_params:
+        voxel_size: *voxel_size
+        lidar_range: *cav_lidar
+        pillar_vfe:
+          use_norm: True
+          with_distance: False
+          use_absolute_xyz: True
+          num_filters: [ 64 ]
+        point_pillar_scatter:
+          num_features: 64
     drone:
-      modalities: ["lidar"]  # "cam", "lidar"
-
-      lidar:
-        voxel_size: *voxel_size
-        lidar_range: *cav_lidar
-        compression: 0 # compression rate
-        backbone_fix: false
-        pillar_vfe:
-          use_norm: true
-          with_distance: false
-          use_absolute_xyz: true
-          num_filters: [64]
-        point_pillar_scatter:
-          num_features: 64
-
-      cam:
-        grid_conf: *grid_conf
-        data_aug_conf: *data_aug_conf_image
-        img_downsample: 8
-        img_features: 64
-        bevout_feature: 64
-        camera_encoder: EfficientNet
-        use_depth_gt: true
-        depth_supervision: false
+      grid_conf: *grid_conf
+      data_aug_conf: *data_aug_conf_image
+      img_downsample: 8
+      img_features: 64
+      bevout_feature: 64
+      bev_dim: 64
+      camera_encoder: EfficientNet
+      use_depth_gt: true
+      depth_supervision: false
       
     # params for modality fusion
     modality_fusion:
-      base_bev_backbone:
-        layer_nums: [3, 5, 8]
-        layer_strides: [2, 2, 2]
-        num_filters: [64, 128, 256]
-        upsample_strides: [1, 2, 4]
-        num_upsample_filter: [128, 128, 128]
+      bev_backbone:
+        encode_first: false
+        multi_scale: true
+
+        layer_nums: &layer_nums [3, 4, 5] #[ 3, 5, 8 ]
+        layer_strides: [ 2, 2, 2 ]
+        num_filters: &num_filters [ 64, 128, 256 ]
+        upsample_strides: [ 1, 2, 4 ]
+        num_upsample_filter: [ 128, 128, 128 ]
+        voxel_size: *voxel_size
       
       shrink_header:
         use: true 
         input_dim: 384  # 128 * 3
         dim: [ &out_channels 256 ] 
-        kernal_size: [ 1 ] # TODO(YH): we don't shrink the HW in the current version
+        kernal_size: [ 1 ] # we don't shrink the HW in the current version
         stride: [ 1 ]
         padding: [ 0 ]
       
       compression: 0  # Compression rate
 
       # params for collaborative fusion: where2comm
-    transformer:
-      encoder: &encoder
-        # number of fusion blocks per encoder layer
-        num_blocks: 1
-        # number of encoder layers
-        depth: 3
-        use_roi_mask: true
-        use_RTE: &use_RTE true
-        RTE_ratio: &RTE_ratio 2 # 2 means the dt has 100ms interval while 1 means 50 ms interval
-        # agent-wise attention
-        cav_att_config: &cav_att_config 
-          dim: 256
-          use_hetero: true
-          use_RTE: *use_RTE
-          RTE_ratio: *RTE_ratio
-          heads: 8
-          dim_head: 32
-          dropout: 0.3
-        # spatial-wise attention
-        pwindow_att_config: &pwindow_att_config
-          dim: 256
-          heads: [16, 8, 4]
-          dim_head: [16, 32, 64]
-          dropout: 0.3
-          window_size: [2, 4, 4] # TODO(YH): feature shape is [N, C, 100, 352, D], set window size that is dividable by H, W
-          relative_pos_embedding: true
-          fusion_method: 'split_attn'
-        # feedforward condition
-        feed_forward: &feed_forward
-          mlp_dim: 256
-          dropout: 0.3
-        sttf: &sttf
-          voxel_size: *voxel_size
-          downsample_rate: 4
+    collaborative_fusion:
+      fully: False
+      voxel_size: *voxel_size
+      downsample_rate: 1
+      in_channels: *out_channels
+      
+      communication:
+        round: 1
+        #threshold: 0.01
+        #gaussian_smooth:
+        #  k_size: 5
+        #  c_sigma: 1.0
+      agg_operator:
+        mode: 'ATTEN'
+        feature_dim: *out_channels
+      multi_scale: True
+      layer_nums: *layer_nums
+      num_filters: *num_filters
 
     # params for prediction
     task: *task
@@ -303,8 +249,7 @@ model:
     static_class: *static_class
     cav_range: *cav_lidar
     seg_res: *seg_res
-    obj_head: true
-loss:
+    obj_head: trueloss:
   det:
     core_method: point_pillar_loss_multiclass
     args:
@@ -336,6 +281,6 @@ optimizer:
 
 lr_scheduler:
   core_method: multistep #step, multistep and Exponential support
-  gamma: 0.1
-  step_size: [10, 25]
+  gamma: 0.2
+  step_size: [10, 20]
 

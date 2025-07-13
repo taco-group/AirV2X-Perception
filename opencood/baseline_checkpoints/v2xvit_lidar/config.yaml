@@ -1,0 +1,475 @@
+active_sensors: &id001
+- lidar
+bevcam_fov: 110
+collaborators: &id002
+- vehicle
+- rsu
+- drone
+data_augment:
+- ALONG_AXIS_LIST:
+  - x
+  NAME: random_world_flip
+- NAME: random_world_rotation
+  WORLD_ROT_ANGLE:
+  - -0.78539816
+  - 0.78539816
+- NAME: random_world_scaling
+  WORLD_SCALE_RANGE:
+  - 0.95
+  - 1.05
+device: cuda
+dynamic_class: 7
+ego_type: vehicle
+fusion:
+  args:
+    drone_data_aug_conf: &id003
+      H: 720
+      W: 1280
+      bot_pct_lim:
+      - 0.0
+      - 0.05
+      final_dim:
+      - 360
+      - 640
+      rand_flip: false
+      resize_lim:
+      - 0.65
+      - 0.7
+      rot_lim:
+      - -3.6
+      - 3.6
+    drone_grid_conf: &id004
+      ddiscr:
+      - 6
+      - 150
+      - 144
+      mode: UD
+      xbound:
+      - -140.8
+      - 140.8
+      - 0.4
+      ybound:
+      - -40
+      - 40
+      - 0.4
+      zbound:
+      - -150
+      - -6
+      - 144
+    proj_first: true
+    rsu_data_aug_conf: &id005
+      H: 720
+      W: 1280
+      bot_pct_lim:
+      - 0.0
+      - 0.05
+      final_dim:
+      - 360
+      - 640
+      rand_flip: false
+      resize_lim:
+      - 0.65
+      - 0.7
+      rot_lim:
+      - 0
+      - 0
+    rsu_grid_conf: &id006
+      ddiscr:
+      - 2
+      - 50
+      - 48
+      mode: LID
+      xbound:
+      - -140.8
+      - 140.8
+      - 0.4
+      ybound:
+      - -40
+      - 40
+      - 0.4
+      zbound:
+      - -30
+      - 30
+      - 60.0
+    veh_data_aug_conf: &id008
+      H: 720
+      W: 1280
+      bot_pct_lim:
+      - 0.0
+      - 0.05
+      final_dim:
+      - 360
+      - 640
+      rand_flip: false
+      resize_lim:
+      - 0.65
+      - 0.7
+      rot_lim:
+      - 0
+      - 0
+    veh_grid_conf: &id009
+      ddiscr:
+      - 2
+      - 50
+      - 48
+      mode: LID
+      xbound:
+      - -140.8
+      - 140.8
+      - 0.4
+      ybound:
+      - -40
+      - 40
+      - 0.4
+      zbound:
+      - -10
+      - 10
+      - 20.0
+  core_method: IntermediateFusionDatasetAirv2x
+loss:
+  det:
+    args:
+      cls_weight: 1.0
+      num_class: 7
+      reg: 2.0
+    core_method: point_pillar_loss_multiclass
+  seg:
+    args:
+      d_coe: 2.0
+      d_weights:
+      - 200.0
+      - 200.0
+      - 75.0
+      - 200.0
+      - 200.0
+      - 200.0
+      l_weights: 8.0
+      s_coe: 0.0
+      s_weights: 50.0
+      seg_branch: both
+    core_method: vanilla_seg_loss
+lr_scheduler:
+  core_method: multistep
+  gamma: 0.1
+  step_size:
+  - 10
+  - 25
+  - 40
+model:
+  args:
+    active_sensors: *id001
+    anchor_number: 2
+    backbone_fix: false
+    cav_range: &id012
+    - -140.8
+    - -40
+    - -3
+    - 140.8
+    - 40
+    - 1
+    collaborators: *id002
+    device: cuda
+    drone:
+      cam:
+        bevout_feature: 64
+        camera_encoder: EfficientNet
+        data_aug_conf: *id003
+        depth_supervision: false
+        grid_conf: *id004
+        img_downsample: 8
+        img_features: 64
+        use_depth_gt: true
+      lidar:
+        backbone_fix: false
+        compression: 0
+        lidar_range:
+        - -140.8
+        - -40
+        - -150
+        - 140.8
+        - 40
+        - -6
+        pillar_vfe:
+          num_filters:
+          - 64
+          use_absolute_xyz: true
+          use_norm: true
+          with_distance: false
+        point_pillar_scatter:
+          grid_size: &id007 !!python/object/apply:numpy.core.multiarray._reconstruct
+            args:
+            - &id010 !!python/name:numpy.ndarray ''
+            - !!python/tuple
+              - 0
+            - !!binary |
+              Yg==
+            state: !!python/tuple
+            - 1
+            - !!python/tuple
+              - 3
+            - &id011 !!python/object/apply:numpy.dtype
+              args:
+              - i8
+              - false
+              - true
+              state: !!python/tuple
+              - 3
+              - <
+              - null
+              - null
+              - null
+              - -1
+              - -1
+              - 0
+            - false
+            - !!binary |
+              wAIAAAAAAADIAAAAAAAAAAEAAAAAAAAA
+          num_features: 64
+        voxel_size:
+        - 0.4
+        - 0.4
+        - 144
+      modalities:
+      - lidar
+    dynamic_class: 7
+    ego_type: vehicle
+    head_dim: 256
+    max_cav: &id014
+      drone: 2
+      rsu: 2
+      vehicle: 3
+    max_cav_num: 7
+    modality_fusion:
+      base_bev_backbone:
+        layer_nums:
+        - 3
+        - 5
+        - 8
+        layer_strides:
+        - 2
+        - 2
+        - 2
+        num_filters:
+        - 64
+        - 128
+        - 256
+        num_upsample_filter:
+        - 128
+        - 128
+        - 128
+        upsample_strides:
+        - 1
+        - 2
+        - 4
+      compression: 0
+      shrink_header:
+        dim:
+        - 256
+        input_dim: 384
+        kernal_size:
+        - 1
+        padding:
+        - 0
+        stride:
+        - 1
+        use: true
+    num_class: 7
+    obj_head: true
+    outC: 256
+    proj_first: true
+    rsu:
+      cam:
+        bevout_feature: 64
+        camera_encoder: EfficientNet
+        data_aug_conf: *id005
+        depth_supervision: false
+        grid_conf: *id006
+        img_downsample: 8
+        img_features: 64
+        use_depth_gt: true
+      lidar:
+        backbone_fix: false
+        compression: 0
+        lidar_range:
+        - -140.8
+        - -40
+        - -30
+        - 140.8
+        - 40
+        - 30
+        pillar_vfe:
+          num_filters:
+          - 64
+          use_absolute_xyz: true
+          use_norm: true
+          with_distance: false
+        point_pillar_scatter:
+          grid_size: *id007
+          num_features: 64
+        voxel_size:
+        - 0.4
+        - 0.4
+        - 60
+      modalities:
+      - lidar
+    seg_branch: both
+    seg_hw: 512
+    seg_res: 0.25
+    static_class: 3
+    supervise_single: false
+    task: det
+    train: true
+    transformer:
+      encoder:
+        RTE_ratio: 2
+        cav_att_config:
+          RTE_ratio: 2
+          dim: 256
+          dim_head: 32
+          dropout: 0.3
+          heads: 8
+          use_RTE: true
+          use_hetero: true
+        depth: 3
+        feed_forward:
+          dropout: 0.3
+          mlp_dim: 256
+        num_blocks: 1
+        pwindow_att_config:
+          dim: 256
+          dim_head:
+          - 16
+          - 32
+          - 64
+          dropout: 0.3
+          fusion_method: split_attn
+          heads:
+          - 16
+          - 8
+          - 4
+          relative_pos_embedding: true
+          window_size:
+          - 2
+          - 4
+          - 4
+        sttf:
+          downsample_rate: 4
+          voxel_size: &id013
+          - 0.4
+          - 0.4
+          - 4
+        use_RTE: true
+        use_roi_mask: true
+    vehicle:
+      cam:
+        bevout_feature: 64
+        camera_encoder: EfficientNet
+        data_aug_conf: *id008
+        depth_supervision: false
+        grid_conf: *id009
+        img_downsample: 8
+        img_features: 64
+        use_depth_gt: true
+      lidar:
+        backbone_fix: false
+        compression: 0
+        lidar_range:
+        - -140.8
+        - -40
+        - -3
+        - 140.8
+        - 40
+        - 1
+        pillar_vfe:
+          num_filters:
+          - 64
+          use_absolute_xyz: true
+          use_norm: true
+          with_distance: false
+        point_pillar_scatter:
+          grid_size: !!python/object/apply:numpy.core.multiarray._reconstruct
+            args:
+            - *id010
+            - !!python/tuple
+              - 0
+            - !!binary |
+              Yg==
+            state: !!python/tuple
+            - 1
+            - !!python/tuple
+              - 3
+            - *id011
+            - false
+            - !!binary |
+              wAIAAAAAAADIAAAAAAAAAAEAAAAAAAAA
+          num_features: 64
+        voxel_size:
+        - 0.4
+        - 0.4
+        - 4
+      modalities:
+      - lidar
+  core_method: airv2x_v2xvit
+name: airv2x_intermediate_v2xvit
+num_anchor: 2
+num_class: 7
+optimizer:
+  args:
+    eps: 1.0e-10
+    weight_decay: 0.0001
+  core_method: Adam
+  lr: 0.002
+postprocess:
+  anchor_args:
+    D: 1
+    H: 200
+    W: 704
+    cav_lidar_range: *id012
+    feature_stride: 2
+    h: 1.56
+    l: 3.9
+    num: 2
+    r:
+    - 0
+    - 90
+    vd: 4
+    vh: 0.4
+    vw: 0.4
+    w: 1.6
+  core_method: VoxelPostprocessor
+  ego_type: vehicle
+  max_num: 300
+  nms_thresh: 0.15
+  order: hwl
+  target_args:
+    neg_threshold: 0.45
+    obj_threshold: 0.2
+    pos_threshold: 0.6
+    score_threshold: 0.2
+preprocess:
+  args:
+    max_points_per_voxel: 32
+    max_voxel_test: 70000
+    max_voxel_train: 32000
+    voxel_size: *id013
+  cav_lidar_range: *id012
+  core_method: SpVoxelPreprocessor
+  ego_type: vehicle
+root_dir: dataset/airv2x/train
+seg_branch: both
+seg_hw: 512
+seg_res: 0.25
+static_class: 3
+tag: default
+task: det
+train: true
+train_params:
+  batch_size: 1
+  epoches: 50
+  eval_freq: 2
+  max_cav: *id014
+  max_cav_num: 7
+  save_freq: 1
+validate_dir: dataset/airv2x/val
+test_dir: dataset/airv2x/test
+yaml_parser: load_airv2x_params
