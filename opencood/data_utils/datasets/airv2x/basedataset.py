@@ -286,7 +286,8 @@ class BaseDataset(Dataset):
             
             data[cav_id]["lidar_np"] = (
                 pcd_utils.pcd_to_np(
-                    cav_content[timestamp_key_delay]["lidars"][0]
+                    cav_content[timestamp_key_delay]["lidars"][0],
+                    correct_coordinate_system=self.correct_lidar_coordinate_system
                 )  # TODO(YH): don't consider semantic lidar for now
                 # if agent_type != "drone"
                 # else []

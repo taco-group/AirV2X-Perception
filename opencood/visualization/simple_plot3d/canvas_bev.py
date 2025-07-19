@@ -334,7 +334,7 @@ class Canvas_BEV_heading_right(object):
         x = xy[:, 0]
         y = xy[:, 1]
 
-        if not self.left_hand:
+        if self.left_hand:
             y = -y
 
         # Get valid mask

@@ -93,6 +93,10 @@ def main():
         from opencood.utils import eval_utils_opv2v as eval_utils
 
         left_hand = True
+        if "test_dir" in hypes:
+            hypes["validate_dir"] = hypes["test_dir"]
+        else:
+            raise ValueError("test_dir not found in config file")
 
     elif "dair" in opt.model_dir:
         from opencood.utils import eval_utils_where2comm as eval_utils

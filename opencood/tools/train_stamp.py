@@ -135,7 +135,7 @@ def main():
         model = torch.nn.parallel.DistributedDataParallel(
             model,
             device_ids=[opt.gpu],
-            find_unused_parameters=True,  # TODO(YH): skipped branch
+            find_unused_parameters=False,  # TODO(YH): skipped branch
         )
         model_without_ddp = model.module
     # define the loss

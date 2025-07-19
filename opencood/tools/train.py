@@ -10,15 +10,16 @@ import statistics
 import sys
 from pathlib import Path
 
-root_path = os.path.abspath(__file__)
-root_path = "/".join(root_path.split("/")[:-3])
-sys.path.append(root_path)
-
-import torch
+import torch, resource
+torch.multiprocessing.set_sharing_strategy('file_system')
+resource.setrlimit(resource.RLIMIT_NOFILE, (4096, 4096))
 from torch.cuda import amp
 from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader, DistributedSampler
 from tqdm import tqdm
+
+root_path = Path(__file__).resolve().parents[2]
+sys.path.append(str(root_path))
 
 import opencood.hypes_yaml.yaml_utils as yaml_utils
 from opencood.data_utils.datasets import build_dataset
@@ -44,7 +45,7 @@ def train_parser():
                       help="Node rank for distributed training")
     parser.add_argument("--tag", default="default",
                       help="Tag for the training session")
-    parser.add_argument("--worker", default=16, type=int,
+    parser.add_argument("--worker", default=8, type=int,
                       help="Number of workers for data loading")
     parser.add_argument("--amp", action="store_true",
                       help="Enable automatic mixed precision training")

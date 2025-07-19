@@ -71,6 +71,21 @@ class IntermediateFusionDatasetAirv2x(basedataset.BaseDataset):
             self.proj_first = params["fusion"]["args"]["proj_first"]
         # self.proj_first = False
         print("proj_first: ", self.proj_first)
+        
+        # TODO: COORDINATE SYSTEM CORRECTION FLAG
+        # ===========================================
+        # After regenerating dataset with the modified SkyLink-V2X code (which now saves 
+        # LiDAR data with corrected coordinate system), set this flag to False to use 
+        # the corrected data directly. For legacy datasets, set this to True to apply
+        # coordinate system correction during loading.
+        # 
+        # Usage:
+        # - Legacy dataset (old): correct_lidar_coordinate_system: True  
+        # - New dataset (regenerated): correct_lidar_coordinate_system: False
+        # 
+        # This flag can be set in the config file under the dataset parameters.
+        self.correct_lidar_coordinate_system = params.get("correct_lidar_coordinate_system", False)
+        print("correct_lidar_coordinate_system: ", self.correct_lidar_coordinate_system)
 
         self.N = 0  # used for debug depth map
 
@@ -95,20 +110,6 @@ class IntermediateFusionDatasetAirv2x(basedataset.BaseDataset):
         self.rsu_data_aug_conf = params["fusion"]["args"]["rsu_data_aug_conf"]
         self.drone_data_aug_conf = params["fusion"]["args"]["drone_data_aug_conf"]
         
-        # self.veh_grid_conf = params["fusion"]["args"]["grid_conf"]
-        # self.depth_discre = camera_utils.depth_discretization(
-        #     self.grid_conf["ddiscr"][0],
-        #     self.grid_conf["ddiscr"][1],
-        #     self.grid_conf["ddiscr"][2],
-        #     self.grid_conf["mode"],
-        # )
-
-        # if self.use_cam:
-        #     self.data_aug_conf_cam = params["image_modality"]["data_aug_conf"]
-
-        # if self.use_lidar:
-        #     self.data_aug_conf_lidar = params["lidar_modality"]["data_aug_conf"]
-
         self.training = train
 
         # whether there is a time delay between the time that cav project

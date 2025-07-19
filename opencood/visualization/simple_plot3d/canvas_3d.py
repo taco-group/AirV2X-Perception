@@ -104,6 +104,7 @@ class Canvas_3D(object):
                 canvas_xy fits into canvas (are visible from virtual camera).
             depth (ndarray): Optionally returned (N,) array of depth values
         """
+        xyz = xyz.copy()  # Prevent in-place modifications
         if self.left_hand:
             xyz[:, 1] = -xyz[:, 1]
 

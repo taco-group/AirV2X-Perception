@@ -18,7 +18,9 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
-import torch
+import torch, resource
+torch.multiprocessing.set_sharing_strategy('file_system')
+resource.setrlimit(resource.RLIMIT_NOFILE, (4096, 4096))
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -312,7 +314,7 @@ def main():
     dataloader = DataLoader(
         dataset,
         batch_size=1,
-        num_workers=16,
+        num_workers=4,
         collate_fn=dataset.collate_batch_test,
         shuffle=False,
         pin_memory=False,

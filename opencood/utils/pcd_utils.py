@@ -40,7 +40,7 @@ from pypcd import pypcd
 #     return np.asarray(pcd_np, dtype=np.float32)
 
 
-def pcd_to_np(pcd_file, get_weather=False):
+def pcd_to_np(pcd_file, get_weather=False, correct_coordinate_system=False):
     """
     Read  pcd and return numpy array.
 
@@ -48,6 +48,10 @@ def pcd_to_np(pcd_file, get_weather=False):
     ----------
     pcd_file : str
         The pcd file that contains the point cloud.
+    get_weather : bool
+        Whether to return weather information
+    correct_coordinate_system : bool
+        Whether to apply coordinate system correction for legacy datasets
 
     Returns
     -------
@@ -64,6 +68,13 @@ def pcd_to_np(pcd_file, get_weather=False):
     intensity = np.expand_dims(np.asarray(pcd.colors)[:, 0], -1)
     pcd_np = np.hstack((xyz, intensity))
     pcd_np = np.asarray(pcd_np, dtype=np.float32)
+    
+    # Apply coordinate system correction for legacy datasets
+    # TODO: Remove this correction once new datasets are generated with correct coordinate system
+    if correct_coordinate_system:
+        print("Applying coordinate system correction")
+        pcd_np[:, 1] = -pcd_np[:, 1]  # Flip y-axis to match segmentation map coordinate system
+    
     if get_weather:
         label = np.asarray(pcd.colors)[:, 1]
         return pcd_np, label
@@ -291,7 +302,7 @@ def downsample_lidar_minimum(pcd_np_list):
     return pcd_np_list
 
 
-def read_pcd(pcd_path):
+def read_pcd(pcd_path, correct_coordinate_system=False):
     # x y z r g b intensity timestamp 每个点包含哪些维度
     # xyz表示XYZ三维坐标，rgb表示颜色（可以分开表示，也可以一个浮点数表示），
     # intensity表示激光反射强度，timestamp表示时间戳，normal_x、normal_y、normal_z表示平面法线三维坐标，j1、j2、j3表示不变矩。
@@ -304,6 +315,12 @@ def read_pcd(pcd_path):
     pcd_np_points[:, 1] = np.transpose(pcd.pc_data["y"])
     pcd_np_points[:, 2] = np.transpose(pcd.pc_data["z"])
     pcd_np_points[:, 3] = np.transpose(pcd.pc_data["intensity"]) / 256.0
+    
+    # Apply coordinate system correction for legacy datasets
+    # TODO: Remove this correction once new datasets are generated with correct coordinate system
+    if correct_coordinate_system:
+        pcd_np_points[:, 1] = -pcd_np_points[:, 1]  # Flip y-axis to match segmentation map coordinate system
+    
     del_index = np.where(np.isnan(pcd_np_points))[0]
     pcd_np_points = np.delete(pcd_np_points, del_index, axis=0)
     return pcd_np_points, time
