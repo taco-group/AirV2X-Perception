@@ -15,8 +15,14 @@
 Download **AirV2X‑Perception** from Hugging Face and extract it to any location:
 
 ```bash
-git lfs install
+mkdir dataset
+cd dataset # Use another directory to avoid naming conflict
+conda install -c conda-forge git-lfs
+git lfs install --skip-smudge
 git clone https://huggingface.co/datasets/xiangbog/AirV2X-Perception
+cd AirV2X-Perception
+git lfs pull
+# git lfs pull --include "path/to/folder"   # If you would like to download only partial of the dataset
 ```
 
 We also provide a *mini batch* for quick testing and debugging.
