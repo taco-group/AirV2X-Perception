@@ -47,6 +47,7 @@ from opencood.utils.pcd_utils import (
     shuffle_points,
 )
 from opencood.utils.transformation_utils import x1_to_x2
+from opencood.utils.pose_utils import add_noise_data_dict
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -196,6 +197,8 @@ class IntermediateFusionDatasetAirv2x(basedataset.BaseDataset):
         static_seg_label = None
         metadata_path = None
 
+        too_far = []
+
         # Collect data for each agent
         for cav_id, selected_cav_base in base_data_dict.items():
             agent_type = selected_cav_base["agent_type"]
@@ -203,6 +206,7 @@ class IntermediateFusionDatasetAirv2x(basedataset.BaseDataset):
             
             # Skip if out of communication range
             if distance > agent_data[agent_type]["com_range"]:
+                too_far.append(cav_id)
                 continue
                 
             selected_cav_processed = self.get_item_single_car(
@@ -229,6 +233,10 @@ class IntermediateFusionDatasetAirv2x(basedataset.BaseDataset):
                 metadata_path = selected_cav_base["metadata_path"]
                 dynamic_seg_label = selected_cav_base["dynamic_seg_label"]
                 static_seg_label = selected_cav_base["static_seg_label"]
+        
+        # NOTE: fix eliminate pruned cavs
+        for cav_id in too_far:
+            base_data_dict.pop(cav_id)
         
         # Common data collectors for all agent types
         all_object_stack = []

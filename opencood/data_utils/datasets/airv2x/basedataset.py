@@ -456,9 +456,6 @@ class BaseDataset(Dataset):
             cur_cav_lidar_rel_pose, cur_cav_vehicle_pose
         )
 
-        delay_params["cur_cav_lidar_pose"] = cur_cav_lidar_pose
-        delay_params["delay_cav_lidar_pose"] = delay_cav_lidar_pose
-
         if not cav_content["ego"] and self.loc_err_flag:
             delay_cav_lidar_pose = self.add_loc_noise(
                 delay_cav_lidar_pose, self.xyz_noise_std, self.ryp_noise_std
@@ -466,6 +463,9 @@ class BaseDataset(Dataset):
             cur_cav_lidar_pose = self.add_loc_noise(
                 cur_cav_lidar_pose, self.xyz_noise_std, self.ryp_noise_std
             )
+
+        delay_params["cur_cav_lidar_pose"] = cur_cav_lidar_pose
+        delay_params["delay_cav_lidar_pose"] = delay_cav_lidar_pose
 
         if cur_ego_pos_flag:
             transformation_matrix = x1_to_x2(
