@@ -3,10 +3,12 @@
 **Official implementation of**  
 **“AirV2X: Unified Air–Ground/Vehicle‑to‑Everything Collaboration for Perception”**
 
-[![Paper](https://img.shields.io/badge/arXiv-Paper-red.svg)](https://arxiv.org/abs/2506.19283)
+
+<!-- [![Paper](https://img.shields.io/badge/arXiv-Paper-red.svg)](https://arxiv.org/abs/2506.19283)
 [![Project Page](https://img.shields.io/badge/Project-Page-1f72ff.svg)](https://xiangbogaobarry.github.io/AirV2X/)
 [![Code](https://img.shields.io/badge/GitHub-Code-black.svg)](https://github.com/taco-group/AirV2X-Perception)
-[![Dataset](https://img.shields.io/badge/HuggingFace-Dataset-yellow.svg)](https://huggingface.co/datasets/xiangbog/AirV2X-Perception)
+[![Dataset](https://img.shields.io/badge/HuggingFace-Dataset-yellow.svg)](https://huggingface.co/datasets/xiangbog/AirV2X-Perception) 
+-->
 
 ---
 
