@@ -98,21 +98,6 @@ python opencood/tools/inference_multi_scenario.py \
     --save_vis
 ```
 
----
-
-## 📦 Pre‑Trained Checkpoints
-
-| Modality | Model | AP@0.3 | AP@0.5 | AP@0.7 | Config & Checkpoint |
-|---|---|---|---|---|---|
-| **LiDAR** | When2Com | 0.1824 | 0.0787 | 0.0025 | *Coming soon* |
-|  | CoBEVT | **0.4922** | **0.4585** | **0.2582** | [HF](https://huggingface.co/xiangbog/AirV2X-Perception-Checkpoints/tree/main/airv2x_intermediate_cobevt/release) |
-|  | Where2Comm | 0.4366 | 0.4015 | 0.1538 | [HF](https://huggingface.co/xiangbog/AirV2X-Perception-Checkpoints/tree/main/airv2x_intermediate_where2comm/release) |
-|  | V2X‑ViT | 0.4401 | 0.3821 | 0.1638 | [HF](https://huggingface.co/xiangbog/AirV2X-Perception-Checkpoints/tree/main/airv2x_intermediate_v2xvit/release) |
-
-> **Note**  
-> The above checkpoints were trained for **50 epochs** with `batch_size=2`, so their numbers may differ slightly from the paper.
-
-Additional Camera‑only and Multi‑modal checkpoints are on the way.
 
 ---
 
