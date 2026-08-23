@@ -62,7 +62,7 @@ class ResNetBEVBackbone(nn.Module):
                         )
                     )
                 else:
-                    stride = np.round(1 / stride).astype(np.int)
+                    stride = np.round(1 / stride).astype(int)
                     self.deblocks.append(
                         nn.Sequential(
                             nn.Conv2d(

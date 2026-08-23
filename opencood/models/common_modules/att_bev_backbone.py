@@ -108,7 +108,7 @@ class AttBEVBackbone_MGF(nn.Module):
                         )
                     )
                 else:
-                    stride = np.round(1 / stride).astype(np.int)
+                    stride = np.round(1 / stride).astype(int)
                     self.deblocks.append(
                         nn.Sequential(
                             nn.Conv2d(
@@ -206,7 +206,7 @@ class AttBEVBackbone_MGF(nn.Module):
                         )
                     )
                 else:
-                    stride = np.round(1 / stride).astype(np.int)
+                    stride = np.round(1 / stride).astype(int)
                     self.L_deblocks.append(
                         nn.Sequential(
                             nn.Conv2d(
@@ -272,7 +272,7 @@ class AttBEVBackbone_MGF(nn.Module):
                         )
                     )
                 else:
-                    stride = np.round(1 / stride).astype(np.int)
+                    stride = np.round(1 / stride).astype(int)
                     self.R_deblocks.append(
                         nn.Sequential(
                             nn.Conv2d(
@@ -454,7 +454,7 @@ class AttBEVBackbone(nn.Module):
                         )
                     )
                 else:
-                    stride = np.round(1 / stride).astype(np.int)
+                    stride = np.round(1 / stride).astype(int)
                     self.deblocks.append(
                         nn.Sequential(
                             nn.Conv2d(
